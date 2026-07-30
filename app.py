@@ -4,29 +4,32 @@ import requests
 import io
 
 # --- 1. PAGE CONFIGURATION ---
-# Using the custom logo for the browser tab
-st.set_page_config(page_title="Sales Dashboard", page_icon="logo.png", layout="wide")
+st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING ---
+# --- HIDE STREAMLIT BRANDING (RESTORED HEADER FOR REFRESH) ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            header {visibility: hidden;}
+            /* header {visibility: hidden;} <- Removed so you can use the top refresh button */
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-st.title("📊 Sales Volume & Market Share")
+# --- CUSTOM TITLE WITH LOGO ---
+# Creates a row with the logo on the left and the smaller title on the right
+col_logo, col_title = st.columns([1, 6])
+with col_logo:
+    try:
+        st.image("logo.png", width=60) # Displays the logo
+    except Exception:
+        st.warning("logo.png missing") # Alerts you if the file name is mismatched
+with col_title:
+    st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
+
 
 # --- 2. DATA FETCHING (ONLINE SHAREPOINT SECRETS) ---
 SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"]
-
-# Place the company logo at the top of the sidebar
-try:
-    st.sidebar.image("logo.png", use_column_width=True)
-except Exception:
-    pass # Failsafe in case the image isn't uploaded yet
 
 st.sidebar.header("📁 Data Source")
 
@@ -177,7 +180,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. EXTREME MOBILE-OPTIMIZED HTML TABLE ---
+# --- 7. EXTREME MOBILE-OPTIMIZED HTML TABLE (SMALLER FONT) ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -187,23 +190,22 @@ def generate_html_table(df, metric_type="Volume"):
 
     merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
 
-    # Aggressively compressed CSS for mobile fitting
+    # Base font sizes reduced to 11px, mobile font sizes reduced to 9px
     html = "<style>"
     html += ".table-wrapper { overflow-x: auto; margin-bottom: 20px; }"
-    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 12px; }"
+    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
     html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 4px 4px; text-align: center; letter-spacing: -0.2px; }"
-    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 11px; white-space: nowrap; }"
-    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 11px; }"
+    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
+    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
     html += ".brand-row { background-color: #FFFFFF; }"
-    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 11px; }"
+    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
     html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
-    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 12px; border-top: 2px solid #8EA9DB; }"
-    html += "@media (max-width: 600px) { .custom-dashboard-table { font-size: 10px; } .custom-dashboard-table th, .custom-dashboard-table td { padding: 2px 2px; } .brand-col-text { padding-left: 4px !important; font-size: 10px;} .subtotal-row {font-size: 10px;} }"
+    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
+    html += "@media (max-width: 600px) { .custom-dashboard-table { font-size: 9px; } .custom-dashboard-table th, .custom-dashboard-table td { padding: 2px 2px; font-size: 9px; } .brand-col-text { padding-left: 4px !important; font-size: 9px;} .subtotal-row {font-size: 9px;} }"
     html += "</style>"
     
     html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
     
-    # Abbreviated Mobile-Friendly Headers
     if metric_type == "Volume":
         html += '<thead><tr><th class="seg-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody>'
     else:
