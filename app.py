@@ -40,10 +40,14 @@ def load_data_from_url(url):
         response = requests.get(url, timeout=15)
         response.raise_for_status()
         
+        # Explicitly try pyxlsb first for Excel binary files, fallback to default reader
         try:
             dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="pyxlsb")
         except Exception:
-            dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
+            try:
+                dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="openpyxl")
+            except Exception:
+                dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
             
         return dfs, None
     except Exception as e:
@@ -178,8 +182,6 @@ else:
     filtered_df = temp_df.copy()
 
 # --- 7. HTML TABLE GENERATORS ---
-
-# Standard MS% Table
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -260,7 +262,6 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# Dedicated Combined Deluxe & Deluxe Plus Market Share Table (Growth calculated for all brands and subtotal rows)
 def generate_combined_deluxe_table(df):
     if not df.empty:
         df = df.copy()
