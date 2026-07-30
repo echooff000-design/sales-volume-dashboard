@@ -6,7 +6,7 @@ import io
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING (RESTORED HEADER FOR REFRESH) ---
+# --- HIDE STREAMLIT BRANDING ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -177,7 +177,9 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. FULLY VISIBLE MOBILE-OPTIMIZED HTML TABLE ---
+# --- 7. HTML TABLE GENERATORS ---
+
+# Standard MS% Table
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -197,7 +199,6 @@ def generate_html_table(df, metric_type="Volume"):
     html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
     html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
     html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
-    html += "@media (max-width: 600px) { .custom-dashboard-table { font-size: 10px; } .custom-dashboard-table th, .custom-dashboard-table td { padding: 3px 4px; font-size: 9px; } }"
     html += "</style>"
     
     html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
@@ -216,13 +217,6 @@ def generate_html_table(df, metric_type="Volume"):
     marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
 
-    deluxe_combined_last = 0
-    deluxe_combined_this = 0
-    if metric_type == "Ms%":
-        deluxe_comb_data = merged[merged[seg_col].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])]
-        deluxe_combined_last = deluxe_comb_data["Last Month"].sum()
-        deluxe_combined_this = deluxe_comb_data["This Month"].sum()
-
     for segment, seg_data in merged.groupby(seg_col, sort=False, observed=False):
         seg_last = seg_data["Last Month"].sum()
         seg_target = seg_data["Target"].sum()
@@ -240,12 +234,8 @@ def generate_html_table(df, metric_type="Volume"):
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
 
         else: 
-            if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
-                seg_last_pct = (seg_last / deluxe_combined_last) * 100 if deluxe_combined_last else 0
-                seg_this_pct = (seg_this / deluxe_combined_this) * 100 if deluxe_combined_this else 0
-            else:
-                seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
-                seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
+            seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
+            seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
             
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
             
@@ -254,13 +244,8 @@ def generate_html_table(df, metric_type="Volume"):
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
-                if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
-                    b_last_pct = (row["Last Month"] / deluxe_combined_last) * 100 if deluxe_combined_last else 0
-                    b_this_pct = (row["This Month"] / deluxe_combined_this) * 100 if deluxe_combined_this else 0
-                else:
-                    b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
-                    b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
-                
+                b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
+                b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
                 
                 growth_str = f"{b_growth:,.1f}%" if is_marked else ""
@@ -271,6 +256,62 @@ def generate_html_table(df, metric_type="Volume"):
     else:
         html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
         
+    html += '</tbody></table></div>'
+    return html
+
+# New Dedicated Combined Deluxe & Deluxe Plus Market Share Table
+def generate_combined_deluxe_table(df):
+    if not df.empty:
+        df = df.copy()
+        grouped = df.groupby([seg_col, brand_col], as_index=False, observed=False)[["Last Month", "Target", "This Month"]].sum()
+    else:
+        grouped = pd.DataFrame(columns=[seg_col, brand_col, "Last Month", "Target", "This Month"])
+
+    merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
+    deluxe_comb_data = merged[merged[seg_col].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])]
+
+    comb_last_total = deluxe_comb_data["Last Month"].sum()
+    comb_this_total = deluxe_comb_data["This Month"].sum()
+
+    html = "<style>"
+    html += ".table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }"
+    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
+    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }"
+    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
+    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
+    html += ".brand-row { background-color: #FFFFFF; }"
+    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
+    html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
+    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
+    html += "</style>"
+    
+    html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
+    html += '<thead><tr><th class="seg-col-text">Combined Deluxe & Deluxe Plus</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody>'
+
+    marked_brands = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
+
+    for segment, seg_data in deluxe_comb_data.groupby(seg_col, sort=False, observed=False):
+        seg_last = seg_data["Last Month"].sum()
+        seg_this = seg_data["This Month"].sum()
+        
+        seg_last_pct = (seg_last / comb_last_total) * 100 if comb_last_total else 0
+        seg_this_pct = (seg_this / comb_this_total) * 100 if comb_this_total else 0
+        
+        html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
+        
+        for _, row in seg_data.iterrows():
+            b_name = row[brand_col]
+            is_marked = b_name in marked_brands
+            bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
+            
+            b_last_pct = (row["Last Month"] / comb_last_total) * 100 if comb_last_total else 0
+            b_this_pct = (row["This Month"] / comb_this_total) * 100 if comb_this_total else 0
+            b_growth = b_this_pct - b_last_pct
+            
+            growth_str = f"{b_growth:,.1f}%" if is_marked else ""
+            html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
+
+    html += f'<tr class="grand-total-row"><td class="seg-col-text">Combined Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
     html += '</tbody></table></div>'
     return html
 
@@ -286,3 +327,8 @@ with tab1:
 with tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
     st.write(html_ms, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🔗 Combined Deluxe & Deluxe Plus Market Share")
+    html_combined = generate_combined_deluxe_table(filtered_df)
+    st.write(html_combined, unsafe_allow_html=True)
