@@ -77,6 +77,10 @@ df_raw = pd.pivot_table(
     aggfunc="sum"
 ).reset_index()
 
+# Create a Combined Search Reference Column for the Autocomplete Box
+if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
+    df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
+
 # --- 4. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
 for col in num_cols:
@@ -123,7 +127,7 @@ master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_val
 st.subheader("🔍 Filters")
 col1, col2, col3, col4 = st.columns(4)
 
-# Create a temporary dataframe that updates sequentially for cascading effect
+# Temporary dataframe to update options sequentially
 temp_df = df_raw.copy()
 
 with col1:
@@ -150,21 +154,20 @@ with col4:
     if selected_outlet != "All":
         temp_df = temp_df[temp_df["Outlet Name"].astype(str) == selected_outlet]
 
-search_query = st.text_input("Search Outlet Name / LIC No (Free Text)", "")
+# Restored Autocomplete Multiselect Box (Also cascading)
+if "Search Reference" in temp_df.columns:
+    search_options = sorted(temp_df["Search Reference"].dropna().unique().tolist())
+    selected_search = st.multiselect("🔍 Search & Select Outlet / LIC No", search_options, help="Type keywords to find and select specific outlets")
+else:
+    selected_search = []
 
-# Apply free-text search query
-if search_query:
-    q = search_query.strip().lower()
-    cond = pd.Series(False, index=temp_df.index)
-    if "Outlet Name" in temp_df.columns:
-        cond |= temp_df["Outlet Name"].astype(str).str.lower().str.contains(q)
-    if "LIC No" in temp_df.columns:
-        cond |= temp_df["LIC No"].astype(str).str.lower().str.contains(q)
-    filtered_df = temp_df[cond]
+# --- 6. APPLY FINAL FILTERS ---
+if selected_search:
+    filtered_df = temp_df[temp_df["Search Reference"].isin(selected_search)]
 else:
     filtered_df = temp_df.copy()
 
-# --- 6. DUAL-LOGIC HTML TABLE GENERATOR ---
+# --- 7. DUAL-LOGIC HTML TABLE GENERATOR ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -254,7 +257,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# --- 7. DISPLAY DASHBOARD IN TABS ---
+# --- 8. DISPLAY DASHBOARD IN TABS ---
 st.markdown("---")
 
 tab1, tab2 = st.tabs(["📦 Volume", "📈 Ms%"])
