@@ -25,8 +25,9 @@ with col_logo:
 with col_title:
     st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
 
-# --- 2. DATA FETCHING (ONLINE SHAREPOINT SECRETS) ---
-SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"]
+# --- 2. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
+# Automatically forces the SharePoint link to download as a direct raw binary file
+RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 st.sidebar.header("📁 Data Source")
 
@@ -37,10 +38,10 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 @st.cache_data(ttl=300)
 def load_data_from_url(url):
     try:
-        response = requests.get(url, timeout=15)
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=20)
         response.raise_for_status()
         
-        # Explicitly try pyxlsb first for Excel binary files, fallback to default reader
         try:
             dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="pyxlsb")
         except Exception:
@@ -54,7 +55,7 @@ def load_data_from_url(url):
         return None, str(e)
 
 with st.spinner("Fetching and processing sheets from SharePoint..."):
-    dfs, error = load_data_from_url(SHAREPOINT_URL)
+    dfs, error = load_data_from_url(RAW_SHAREPOINT_URL)
 
 if error or dfs is None:
     st.sidebar.warning("⚠️ Could not auto-fetch from link. Please upload manually.")
