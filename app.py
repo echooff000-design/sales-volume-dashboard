@@ -26,10 +26,14 @@ with col_title:
     st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
 
 # --- 2. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
-# Automatically forces the SharePoint link to download as a direct raw binary file
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 st.sidebar.header("📁 Data Source")
+
+# --- NAVIGATION LINK IN SIDEBAR ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
+st.sidebar.markdown("---")
 
 if st.sidebar.button("🔄 Refresh Data Now"):
     st.cache_data.clear()
