@@ -77,9 +77,6 @@ df_raw = pd.pivot_table(
     aggfunc="sum"
 ).reset_index()
 
-# Create a Combined Search Reference Column for the Autocomplete Box
-df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
-
 # --- 4. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
 for col in num_cols:
@@ -122,49 +119,52 @@ df_raw[brand_col] = pd.Categorical(df_raw[brand_col], categories=final_brand_ord
 
 master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_values(by=[seg_col, brand_col])
 
-# --- 5. SIDEBAR FILTERS ---
+# --- 5. CASCADING SIDEBAR FILTERS ---
 st.subheader("🔍 Filters")
 col1, col2, col3, col4 = st.columns(4)
 
+# Create a temporary dataframe that updates sequentially for cascading effect
+temp_df = df_raw.copy()
+
 with col1:
-    asm_options = ["All"] + sorted(df_raw["ASM"].dropna().astype(str).unique().tolist()) if "ASM" in df_raw.columns else ["All"]
+    asm_options = ["All"] + sorted(temp_df["ASM"].dropna().astype(str).unique().tolist()) if "ASM" in temp_df.columns else ["All"]
     selected_asm = st.selectbox("ASM Filter", asm_options)
+    if selected_asm != "All":
+        temp_df = temp_df[temp_df["ASM"].astype(str) == selected_asm]
 
 with col2:
-    tse_options = ["All"] + sorted(df_raw["TSE"].dropna().astype(str).unique().tolist()) if "TSE" in df_raw.columns else ["All"]
+    tse_options = ["All"] + sorted(temp_df["TSE"].dropna().astype(str).unique().tolist()) if "TSE" in temp_df.columns else ["All"]
     selected_tse = st.selectbox("TSE Filter", tse_options)
+    if selected_tse != "All":
+        temp_df = temp_df[temp_df["TSE"].astype(str) == selected_tse]
 
 with col3:
-    lic_options = ["All"] + sorted(df_raw["LIC No"].dropna().astype(str).unique().tolist()) if "LIC No" in df_raw.columns else ["All"]
+    lic_options = ["All"] + sorted(temp_df["LIC No"].dropna().astype(str).unique().tolist()) if "LIC No" in temp_df.columns else ["All"]
     selected_lic = st.selectbox("LIC No Filter", lic_options)
+    if selected_lic != "All":
+        temp_df = temp_df[temp_df["LIC No"].astype(str) == selected_lic]
 
 with col4:
-    outlet_options = ["All"] + sorted(df_raw["Outlet Name"].dropna().astype(str).unique().tolist()) if "Outlet Name" in df_raw.columns else ["All"]
+    outlet_options = ["All"] + sorted(temp_df["Outlet Name"].dropna().astype(str).unique().tolist()) if "Outlet Name" in temp_df.columns else ["All"]
     selected_outlet = st.selectbox("Outlet Filter", outlet_options)
+    if selected_outlet != "All":
+        temp_df = temp_df[temp_df["Outlet Name"].astype(str) == selected_outlet]
 
-# New Autocomplete Search Box
-search_options = sorted(df_raw["Search Reference"].unique().tolist())
-selected_search = st.multiselect("🔍 Search & Select Outlet / LIC No", search_options, help="Type keywords to find and select specific outlets")
+search_query = st.text_input("Search Outlet Name / LIC No (Free Text)", "")
 
-# --- 6. APPLY FILTERS ---
-filtered_df = df_raw.copy()
+# Apply free-text search query
+if search_query:
+    q = search_query.strip().lower()
+    cond = pd.Series(False, index=temp_df.index)
+    if "Outlet Name" in temp_df.columns:
+        cond |= temp_df["Outlet Name"].astype(str).str.lower().str.contains(q)
+    if "LIC No" in temp_df.columns:
+        cond |= temp_df["LIC No"].astype(str).str.lower().str.contains(q)
+    filtered_df = temp_df[cond]
+else:
+    filtered_df = temp_df.copy()
 
-if selected_asm != "All" and "ASM" in filtered_df.columns:
-    filtered_df = filtered_df[filtered_df["ASM"].astype(str) == selected_asm]
-
-if selected_tse != "All" and "TSE" in filtered_df.columns:
-    filtered_df = filtered_df[filtered_df["TSE"].astype(str) == selected_tse]
-
-if selected_lic != "All" and "LIC No" in filtered_df.columns:
-    filtered_df = filtered_df[filtered_df["LIC No"].astype(str) == selected_lic]
-
-if selected_outlet != "All" and "Outlet Name" in filtered_df.columns:
-    filtered_df = filtered_df[filtered_df["Outlet Name"].astype(str) == selected_outlet]
-
-if selected_search:
-    filtered_df = filtered_df[filtered_df["Search Reference"].isin(selected_search)]
-
-# --- 7. DUAL-LOGIC HTML TABLE GENERATOR ---
+# --- 6. DUAL-LOGIC HTML TABLE GENERATOR ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -189,6 +189,7 @@ def generate_html_table(df, metric_type="Volume"):
     
     html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
     
+    # Dynamic Headers based on Tab
     if metric_type == "Volume":
         html += '<thead><tr><th class="seg-col-text">Seg/Brand</th><th>Last Month</th><th>Target</th><th>This Month</th><th>Balance</th></tr></thead><tbody>'
     else:
@@ -200,6 +201,7 @@ def generate_html_table(df, metric_type="Volume"):
     
     marked_brands = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
     
+    # Calculate Grand Total Balance for Volume Tab only
     marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
 
@@ -209,8 +211,10 @@ def generate_html_table(df, metric_type="Volume"):
         seg_this = seg_data["This Month"].sum()
         
         if metric_type == "Volume":
+            # Segment row
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{int(seg_last):,}</td><td>{int(seg_target):,}</td><td>{int(seg_this):,}</td><td></td></tr>'
             
+            # Brand rows
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 is_marked = b_name in marked_brands
@@ -219,17 +223,20 @@ def generate_html_table(df, metric_type="Volume"):
                 bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{int(row["Last Month"]):,}</td><td>{int(row["Target"]):,}</td><td>{int(row["This Month"]):,}</td><td>{bal_str}</td></tr>'
 
-        else:
+        else: # Ms% Tab
             seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
             seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
             
+            # Segment row (Target removed, Growth left blank)
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
             
+            # Brand rows
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
+                # Brand Volume / Segment Total Volume
                 b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
                 b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
@@ -237,15 +244,17 @@ def generate_html_table(df, metric_type="Volume"):
                 growth_str = f"{b_growth:,.1f}%" if is_marked else ""
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{b_last_pct:,.1f}%</td><td>{b_this_pct:,.1f}%</td><td>{growth_str}</td></tr>'
 
+    # Grand Total Row
     if metric_type == "Volume":
         html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_last_vol):,}</td><td>{int(gt_target_vol):,}</td><td>{int(gt_this_vol):,}</td><td>{int(gt_bal_vol):,}</td></tr>'
     else:
+        # Market share grand total is always 100%, growth left blank
         html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>'
         
     html += '</tbody></table></div>'
     return html
 
-# --- 8. DISPLAY DASHBOARD IN TABS ---
+# --- 7. DISPLAY DASHBOARD IN TABS ---
 st.markdown("---")
 
 tab1, tab2 = st.tabs(["📦 Volume", "📈 Ms%"])
