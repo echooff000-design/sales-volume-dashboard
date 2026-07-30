@@ -4,11 +4,29 @@ import requests
 import io
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Sales Dashboard", layout="wide")
+# Using the custom logo for the browser tab
+st.set_page_config(page_title="Sales Dashboard", page_icon="logo.png", layout="wide")
+
+# --- HIDE STREAMLIT BRANDING ---
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 st.title("📊 Sales Volume & Market Share")
 
 # --- 2. DATA FETCHING (ONLINE SHAREPOINT SECRETS) ---
 SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"]
+
+# Place the company logo at the top of the sidebar
+try:
+    st.sidebar.image("logo.png", use_column_width=True)
+except Exception:
+    pass # Failsafe in case the image isn't uploaded yet
 
 st.sidebar.header("📁 Data Source")
 
@@ -214,7 +232,6 @@ def generate_html_table(df, metric_type="Volume"):
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
                 bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
-                # Numeric cells set to nowrap to keep numbers from breaking, but brand names can wrap
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
 
         else: 
