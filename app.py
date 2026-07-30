@@ -34,44 +34,20 @@ if st.sidebar.button("🔄 Refresh Data Now"):
     st.cache_data.clear()
     st.sidebar.success("Cache cleared! Fetching newest data...")
 
-
-def _read_excel_bytes(raw_bytes: bytes, filename_hint: str = ""):
-    """
-    Read an Excel workbook from raw bytes, choosing the engine based on the
-    file extension when known, and falling back sensibly when it isn't.
-    Avoids wastefully trying the pyxlsb engine against .xlsx/.xls files.
-    """
-    hint = filename_hint.lower()
-
-    if hint.endswith(".xlsb"):
-        return pd.read_excel(io.BytesIO(raw_bytes), sheet_name=None, engine="pyxlsb")
-    if hint.endswith(".xls"):
-        return pd.read_excel(io.BytesIO(raw_bytes), sheet_name=None, engine="xlrd")
-    if hint.endswith(".xlsx"):
-        return pd.read_excel(io.BytesIO(raw_bytes), sheet_name=None, engine="openpyxl")
-
-    # Unknown extension (e.g. a bare SharePoint URL with no filename) -
-    # try the common formats in order rather than assuming .xlsb first.
-    last_err = None
-    for engine in ("openpyxl", "pyxlsb", "xlrd"):
-        try:
-            return pd.read_excel(io.BytesIO(raw_bytes), sheet_name=None, engine=engine)
-        except Exception as e:
-            last_err = e
-            continue
-    raise last_err
-
-
 @st.cache_data(ttl=300)
 def load_data_from_url(url):
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
-        dfs = _read_excel_bytes(response.content, filename_hint=url)
+        
+        try:
+            dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="pyxlsb")
+        except Exception:
+            dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
+            
         return dfs, None
     except Exception as e:
         return None, str(e)
-
 
 with st.spinner("Fetching and processing sheets from SharePoint..."):
     dfs, error = load_data_from_url(SHAREPOINT_URL)
@@ -80,11 +56,8 @@ if error or dfs is None:
     st.sidebar.warning("⚠️ Could not auto-fetch from link. Please upload manually.")
     uploaded_file = st.sidebar.file_uploader("Upload Excel File", type=["xlsx", "xls", "xlsb"])
     if uploaded_file is not None:
-        try:
-            dfs = _read_excel_bytes(uploaded_file.getvalue(), filename_hint=uploaded_file.name)
-        except Exception as e:
-            st.error(f"❌ Could not read the uploaded file: {e}")
-            st.stop()
+        engine = "pyxlsb" if uploaded_file.name.endswith(".xlsb") else None
+        dfs = pd.read_excel(uploaded_file, sheet_name=None, engine=engine)
     else:
         st.error(f"Unable to load data: {error}")
         st.stop()
@@ -100,34 +73,9 @@ df_this = dfs["This Month"].copy()
 df_last = dfs["Last Month"].copy()
 df_target = dfs["Target Data"].copy()
 
-# --- 3a. NORMALIZE COLUMN NAMES & WHITESPACE ---
-# Strip whitespace from column headers AND from the string cell values in
-# each sheet, so the same segment/brand/outlet doesn't accidentally get
-# split into "duplicate" categories across sheets due to stray spaces.
-KNOWN_RENAMES = {"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}
-
-sheet_labels = {"This Month": df_this, "Last Month": df_last, "Target Data": df_target}
-
-for label, d in sheet_labels.items():
+for d in [df_this, df_last, df_target]:
     d.columns = d.columns.astype(str).str.strip()
-    d.rename(columns=KNOWN_RENAMES, inplace=True)
-
-    # Trim whitespace on every text/object column so grouping keys line up
-    # across sheets even if the source Excel has inconsistent padding.
-    # Explicitly include both "object" and pandas' newer "string" dtype so
-    # this keeps working (without warnings) across pandas 2.x and 3.x.
-    obj_cols = d.select_dtypes(include=["object", "string"]).columns
-    for c in obj_cols:
-        d[c] = d[c].astype(str).str.strip().replace({"nan": pd.NA, "": pd.NA})
-
-    # Fail loudly (with a helpful message) instead of a raw KeyError later
-    # if a required "Value" column is missing from this sheet.
-    if "Value" not in d.columns:
-        st.error(
-            f"❌ The '{label}' sheet has no 'Value' (or 'Volume') column after "
-            f"renaming. Found columns: {list(d.columns)}"
-        )
-        st.stop()
+    d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
 
 df_this["Metric"] = "This Month"
 df_last["Metric"] = "Last Month"
@@ -136,34 +84,13 @@ df_target["Metric"] = "Target"
 df_combined = pd.concat([df_this, df_last, df_target], ignore_index=True)
 dim_cols = [c for c in df_combined.columns if c not in ["Metric", "Value"]]
 
-# --- 3b. FILL NaNs IN DIMENSION COLUMNS BEFORE PIVOTING ---
-# pivot_table drops any row that has NaN in one of the index columns.
-# For a sales dashboard that means real volume can silently vanish from
-# the report with no warning. Fill blanks with an explicit placeholder
-# so every row survives the pivot, and separately warn the user if this
-# happened so they know their source data has gaps to fix.
-missing_mask = df_combined[dim_cols].isna().any(axis=1)
-n_missing = int(missing_mask.sum())
-
-for c in dim_cols:
-    if df_combined[c].isna().any():
-        df_combined[c] = df_combined[c].fillna("Unspecified")
-
 df_raw = pd.pivot_table(
-    df_combined,
-    values="Value",
-    index=dim_cols,
-    columns="Metric",
-    aggfunc="sum",
-    dropna=False,
+    df_combined, 
+    values="Value", 
+    index=dim_cols, 
+    columns="Metric", 
+    aggfunc="sum"
 ).reset_index()
-
-if n_missing:
-    st.sidebar.warning(
-        f"⚠️ {n_missing} row(s) had a blank value in a key field "
-        f"(e.g. ASM, TSE, LIC No, Outlet Name) and were labeled 'Unspecified' "
-        f"instead of being dropped. Check your source sheets for gaps."
-    )
 
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
@@ -183,19 +110,19 @@ if not seg_col or not brand_col:
     st.stop()
 
 explicit_seg_order = [
-    "Deluxe-Whisky", "Deluxe Plus-Whisky", "Semi Premium-Whisky",
-    "Deluxe-Gin", "Premium-Brandy", "Premium-Gin",
+    "Deluxe-Whisky", "Deluxe Plus-Whisky", "Semi Premium-Whisky", 
+    "Deluxe-Gin", "Premium-Brandy", "Premium-Gin", 
     "Semi Premium-Brandy", "Single Malt-Scotch"
 ]
 
 explicit_brand_order = [
-    "IBW", "N1WSUP", "OCBL",
-    "IBDC", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak",
-    "MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots",
-    "BLGLM", "BLGOR", "Big Ben", "Blue Riband",
-    "Monarch",
-    "SMG", "SMGP",
-    "MHFB",
+    "IBW", "N1WSUP", "OCBL", 
+    "IBDC", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak", 
+    "MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", 
+    "BLGLM", "BLGOR", "Big Ben", "Blue Riband", 
+    "Monarch", 
+    "SMG", "SMGP", 
+    "MHFB", 
     "SIW"
 ]
 
@@ -250,25 +177,9 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 6. SHARED TABLE CSS (rendered once, not duplicated per table) ---
-TABLE_CSS = """
-<style>
-.table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-.custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
-.custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
-.custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }
-.subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }
-.brand-row { background-color: #FFFFFF; }
-.brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }
-.seg-col-text { text-align: left !important; line-height: 1.2; }
-.grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }
-</style>
-"""
-
-MARKED_BRANDS = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
-
 # --- 7. HTML TABLE GENERATORS ---
 
+# Standard MS% Table
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -278,8 +189,20 @@ def generate_html_table(df, metric_type="Volume"):
 
     merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
 
-    html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
-
+    html = "<style>"
+    html += ".table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }"
+    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
+    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }"
+    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
+    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
+    html += ".brand-row { background-color: #FFFFFF; }"
+    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
+    html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
+    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
+    html += "</style>"
+    
+    html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
+    
     if metric_type == "Volume":
         html += '<thead><tr><th class="seg-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody>'
     else:
@@ -288,70 +211,56 @@ def generate_html_table(df, metric_type="Volume"):
     gt_last_vol = merged["Last Month"].sum()
     gt_target_vol = merged["Target"].sum()
     gt_this_vol = merged["This Month"].sum()
-
-    marked_data = merged[merged[brand_col].isin(MARKED_BRANDS)]
+    
+    marked_brands = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
+    
+    marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
 
     for segment, seg_data in merged.groupby(seg_col, sort=False, observed=False):
         seg_last = seg_data["Last Month"].sum()
         seg_target = seg_data["Target"].sum()
         seg_this = seg_data["This Month"].sum()
-
+        
         if metric_type == "Volume":
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{int(seg_last):,}</td><td>{int(seg_target):,}</td><td>{int(seg_this):,}</td><td></td></tr>'
-
+            
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
-                is_marked = b_name in MARKED_BRANDS
+                is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
-
+                
                 bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
-                html += (
-                    f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td>'
-                    f'<td style="white-space:nowrap;">{int(row["Last Month"]):,}</td>'
-                    f'<td style="white-space:nowrap;">{int(row["Target"]):,}</td>'
-                    f'<td style="white-space:nowrap;">{int(row["This Month"]):,}</td>'
-                    f'<td style="white-space:nowrap;">{bal_str}</td></tr>'
-                )
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
 
-        else:
+        else: 
             seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
             seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
-
-            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
-
+            seg_growth = seg_this_pct - seg_last_pct
+            
+            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
+            
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
-                is_marked = b_name in MARKED_BRANDS
+                is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
-
+                
                 b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
                 b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
-
-                growth_str = f"{b_growth:,.1f}%" if is_marked else ""
-                html += (
-                    f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td>'
-                    f'<td style="white-space:nowrap;">{b_last_pct:,.1f}%</td>'
-                    f'<td style="white-space:nowrap;">{b_this_pct:,.1f}%</td>'
-                    f'<td style="white-space:nowrap;">{growth_str}</td></tr>'
-                )
+                
+                growth_str = f"{b_growth:,.1f}%"
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
 
     if metric_type == "Volume":
-        html += (
-            f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td>'
-            f'<td style="white-space:nowrap;">{int(gt_last_vol):,}</td>'
-            f'<td style="white-space:nowrap;">{int(gt_target_vol):,}</td>'
-            f'<td style="white-space:nowrap;">{int(gt_this_vol):,}</td>'
-            f'<td style="white-space:nowrap;">{int(gt_bal_vol):,}</td></tr>'
-        )
+        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">{int(gt_last_vol):,}</td><td style="white-space:nowrap;">{int(gt_target_vol):,}</td><td style="white-space:nowrap;">{int(gt_this_vol):,}</td><td style="white-space:nowrap;">{int(gt_bal_vol):,}</td></tr>'
     else:
-        html += '<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
-
+        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
+        
     html += '</tbody></table></div>'
     return html
 
-
+# Dedicated Combined Deluxe & Deluxe Plus Market Share Table (Growth calculated for all brands and subtotal rows)
 def generate_combined_deluxe_table(df):
     if not df.empty:
         df = df.copy()
@@ -365,51 +274,60 @@ def generate_combined_deluxe_table(df):
     comb_last_total = deluxe_comb_data["Last Month"].sum()
     comb_this_total = deluxe_comb_data["This Month"].sum()
 
-    html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
+    html = "<style>"
+    html += ".table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }"
+    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
+    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }"
+    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
+    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
+    html += ".brand-row { background-color: #FFFFFF; }"
+    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
+    html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
+    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
+    html += "</style>"
+    
+    html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text">Combined Deluxe & Deluxe Plus</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody>'
+
+    marked_brands = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
 
     for segment, seg_data in deluxe_comb_data.groupby(seg_col, sort=False, observed=False):
         seg_last = seg_data["Last Month"].sum()
         seg_this = seg_data["This Month"].sum()
-
+        
         if seg_last == 0 and seg_this == 0:
             continue
 
         seg_last_pct = (seg_last / comb_last_total) * 100 if comb_last_total else 0
         seg_this_pct = (seg_this / comb_this_total) * 100 if comb_this_total else 0
-
-        html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
-
+        seg_growth = seg_this_pct - seg_last_pct
+        
+        html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
+        
         for _, row in seg_data.iterrows():
             b_last = row["Last Month"]
             b_this = row["This Month"]
-
+            
             if b_last == 0 and b_this == 0:
                 continue
 
             b_name = row[brand_col]
-            is_marked = b_name in MARKED_BRANDS
+            is_marked = b_name in marked_brands
             bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
-
+            
             b_last_pct = (b_last / comb_last_total) * 100 if comb_last_total else 0
             b_this_pct = (b_this / comb_this_total) * 100 if comb_this_total else 0
             b_growth = b_this_pct - b_last_pct
+            
+            growth_str = f"{b_growth:,.1f}%"
+            html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
 
-            growth_str = f"{b_growth:,.1f}%" if is_marked else ""
-            html += (
-                f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td>'
-                f'<td style="white-space:nowrap;">{b_last_pct:,.1f}%</td>'
-                f'<td style="white-space:nowrap;">{b_this_pct:,.1f}%</td>'
-                f'<td style="white-space:nowrap;">{growth_str}</td></tr>'
-            )
-
-    html += '<tr class="grand-total-row"><td class="seg-col-text">Combined Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
+    html += f'<tr class="grand-total-row"><td class="seg-col-text">Combined Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
     html += '</tbody></table></div>'
     return html
 
 # --- 8. DISPLAY DASHBOARD IN TABS ---
 st.markdown("---")
-st.markdown(TABLE_CSS, unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["📦 Volume", "📈 Ms%"])
 
@@ -420,7 +338,7 @@ with tab1:
 with tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
     st.write(html_ms, unsafe_allow_html=True)
-
+    
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 🔗 Combined Deluxe & Deluxe Plus Market Share")
     html_combined = generate_combined_deluxe_table(filtered_df)
