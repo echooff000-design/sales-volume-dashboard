@@ -114,7 +114,9 @@ for label, d in sheet_labels.items():
 
     # Trim whitespace on every text/object column so grouping keys line up
     # across sheets even if the source Excel has inconsistent padding.
-    obj_cols = d.select_dtypes(include="object").columns
+    # Explicitly include both "object" and pandas' newer "string" dtype so
+    # this keeps working (without warnings) across pandas 2.x and 3.x.
+    obj_cols = d.select_dtypes(include=["object", "string"]).columns
     for c in obj_cols:
         d[c] = d[c].astype(str).str.strip().replace({"nan": pd.NA, "": pd.NA})
 
