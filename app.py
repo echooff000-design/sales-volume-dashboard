@@ -236,8 +236,9 @@ def generate_html_table(df, metric_type="Volume"):
         else: 
             seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
             seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
+            seg_growth = seg_this_pct - seg_last_pct
             
-            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
+            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
             
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
@@ -248,7 +249,7 @@ def generate_html_table(df, metric_type="Volume"):
                 b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
                 
-                growth_str = f"{b_growth:,.1f}%" if is_marked else ""
+                growth_str = f"{b_growth:,.1f}%"
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
 
     if metric_type == "Volume":
@@ -259,7 +260,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# Dedicated Combined Deluxe & Deluxe Plus Market Share Table (Filtered to only show segments that have volume > 0)
+# Dedicated Combined Deluxe & Deluxe Plus Market Share Table (Growth calculated for all brands and subtotal rows)
 def generate_combined_deluxe_table(df):
     if not df.empty:
         df = df.copy()
@@ -294,20 +295,19 @@ def generate_combined_deluxe_table(df):
         seg_last = seg_data["Last Month"].sum()
         seg_this = seg_data["This Month"].sum()
         
-        # Skip segments that have 0 volume across both Last Month and This Month
         if seg_last == 0 and seg_this == 0:
             continue
 
         seg_last_pct = (seg_last / comb_last_total) * 100 if comb_last_total else 0
         seg_this_pct = (seg_this / comb_this_total) * 100 if comb_this_total else 0
+        seg_growth = seg_this_pct - seg_last_pct
         
-        html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
+        html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
         
         for _, row in seg_data.iterrows():
             b_last = row["Last Month"]
             b_this = row["This Month"]
             
-            # Hide brands that have 0 volume in both columns
             if b_last == 0 and b_this == 0:
                 continue
 
@@ -319,7 +319,7 @@ def generate_combined_deluxe_table(df):
             b_this_pct = (b_this / comb_this_total) * 100 if comb_this_total else 0
             b_growth = b_this_pct - b_last_pct
             
-            growth_str = f"{b_growth:,.1f}%" if is_marked else ""
+            growth_str = f"{b_growth:,.1f}%"
             html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">Combined Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
