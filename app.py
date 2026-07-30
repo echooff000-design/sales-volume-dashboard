@@ -259,7 +259,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# New Dedicated Combined Deluxe & Deluxe Plus Market Share Table
+# Dedicated Combined Deluxe & Deluxe Plus Market Share Table (Filtered to only show segments that have volume > 0)
 def generate_combined_deluxe_table(df):
     if not df.empty:
         df = df.copy()
@@ -294,18 +294,29 @@ def generate_combined_deluxe_table(df):
         seg_last = seg_data["Last Month"].sum()
         seg_this = seg_data["This Month"].sum()
         
+        # Skip segments that have 0 volume across both Last Month and This Month
+        if seg_last == 0 and seg_this == 0:
+            continue
+
         seg_last_pct = (seg_last / comb_last_total) * 100 if comb_last_total else 0
         seg_this_pct = (seg_this / comb_this_total) * 100 if comb_this_total else 0
         
         html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
         
         for _, row in seg_data.iterrows():
+            b_last = row["Last Month"]
+            b_this = row["This Month"]
+            
+            # Hide brands that have 0 volume in both columns
+            if b_last == 0 and b_this == 0:
+                continue
+
             b_name = row[brand_col]
             is_marked = b_name in marked_brands
             bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
             
-            b_last_pct = (row["Last Month"] / comb_last_total) * 100 if comb_last_total else 0
-            b_this_pct = (row["This Month"] / comb_this_total) * 100 if comb_this_total else 0
+            b_last_pct = (b_last / comb_last_total) * 100 if comb_last_total else 0
+            b_this_pct = (b_this / comb_this_total) * 100 if comb_this_total else 0
             b_growth = b_this_pct - b_last_pct
             
             growth_str = f"{b_growth:,.1f}%" if is_marked else ""
