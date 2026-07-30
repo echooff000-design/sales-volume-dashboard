@@ -11,7 +11,6 @@ hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            /* header {visibility: hidden;} <- Removed so you can use the top refresh button */
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -178,7 +177,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. EXTREME MOBILE-OPTIMIZED HTML TABLE ---
+# --- 7. FULLY VISIBLE MOBILE-OPTIMIZED HTML TABLE ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -189,16 +188,16 @@ def generate_html_table(df, metric_type="Volume"):
     merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
 
     html = "<style>"
-    html += ".table-wrapper { overflow-x: auto; margin-bottom: 20px; }"
+    html += ".table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }"
     html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
-    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 4px 4px; text-align: center; letter-spacing: -0.2px; }"
+    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }"
     html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
     html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
     html += ".brand-row { background-color: #FFFFFF; }"
     html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
     html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
     html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
-    html += "@media (max-width: 600px) { .custom-dashboard-table { font-size: 9px; } .custom-dashboard-table th, .custom-dashboard-table td { padding: 2px 2px; font-size: 9px; } .brand-col-text { padding-left: 4px !important; font-size: 9px;} .subtotal-row {font-size: 9px;} }"
+    html += "@media (max-width: 600px) { .custom-dashboard-table { font-size: 10px; } .custom-dashboard-table th, .custom-dashboard-table td { padding: 3px 4px; font-size: 9px; } }"
     html += "</style>"
     
     html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
