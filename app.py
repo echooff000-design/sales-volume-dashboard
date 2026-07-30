@@ -77,6 +77,9 @@ df_raw = pd.pivot_table(
     aggfunc="sum"
 ).reset_index()
 
+# Create a Combined Search Reference Column for the Autocomplete Box
+df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
+
 # --- 4. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
 for col in num_cols:
@@ -139,7 +142,9 @@ with col4:
     outlet_options = ["All"] + sorted(df_raw["Outlet Name"].dropna().astype(str).unique().tolist()) if "Outlet Name" in df_raw.columns else ["All"]
     selected_outlet = st.selectbox("Outlet Filter", outlet_options)
 
-search_query = st.text_input("Search Outlet Name / LIC No (Free Text)", "")
+# New Autocomplete Search Box
+search_options = sorted(df_raw["Search Reference"].unique().tolist())
+selected_search = st.multiselect("🔍 Search & Select Outlet / LIC No", search_options, help="Type keywords to find and select specific outlets")
 
 # --- 6. APPLY FILTERS ---
 filtered_df = df_raw.copy()
@@ -156,14 +161,8 @@ if selected_lic != "All" and "LIC No" in filtered_df.columns:
 if selected_outlet != "All" and "Outlet Name" in filtered_df.columns:
     filtered_df = filtered_df[filtered_df["Outlet Name"].astype(str) == selected_outlet]
 
-if search_query:
-    q = search_query.strip().lower()
-    cond = pd.Series(False, index=filtered_df.index)
-    if "Outlet Name" in filtered_df.columns:
-        cond |= filtered_df["Outlet Name"].astype(str).str.lower().str.contains(q)
-    if "LIC No" in filtered_df.columns:
-        cond |= filtered_df["LIC No"].astype(str).str.lower().str.contains(q)
-    filtered_df = filtered_df[cond]
+if selected_search:
+    filtered_df = filtered_df[filtered_df["Search Reference"].isin(selected_search)]
 
 # --- 7. DUAL-LOGIC HTML TABLE GENERATOR ---
 def generate_html_table(df, metric_type="Volume"):
