@@ -17,16 +17,14 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # --- CUSTOM TITLE WITH LOGO ---
-# Creates a row with the logo on the left and the smaller title on the right
 col_logo, col_title = st.columns([1, 6])
 with col_logo:
     try:
-        st.image("logo.png", width=60) # Displays the logo
+        st.image("logo.png", width=60)
     except Exception:
-        st.warning("logo.png missing") # Alerts you if the file name is mismatched
+        st.warning("logo.png missing")
 with col_title:
     st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
-
 
 # --- 2. DATA FETCHING (ONLINE SHAREPOINT SECRETS) ---
 SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"]
@@ -180,7 +178,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. EXTREME MOBILE-OPTIMIZED HTML TABLE (SMALLER FONT) ---
+# --- 7. EXTREME MOBILE-OPTIMIZED HTML TABLE ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -190,7 +188,6 @@ def generate_html_table(df, metric_type="Volume"):
 
     merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
 
-    # Base font sizes reduced to 11px, mobile font sizes reduced to 9px
     html = "<style>"
     html += ".table-wrapper { overflow-x: auto; margin-bottom: 20px; }"
     html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
@@ -220,6 +217,13 @@ def generate_html_table(df, metric_type="Volume"):
     marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
 
+    deluxe_combined_last = 0
+    deluxe_combined_this = 0
+    if metric_type == "Ms%":
+        deluxe_comb_data = merged[merged[seg_col].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])]
+        deluxe_combined_last = deluxe_comb_data["Last Month"].sum()
+        deluxe_combined_this = deluxe_comb_data["This Month"].sum()
+
     for segment, seg_data in merged.groupby(seg_col, sort=False, observed=False):
         seg_last = seg_data["Last Month"].sum()
         seg_target = seg_data["Target"].sum()
@@ -237,8 +241,12 @@ def generate_html_table(df, metric_type="Volume"):
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
 
         else: 
-            seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
-            seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
+            if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
+                seg_last_pct = (seg_last / deluxe_combined_last) * 100 if deluxe_combined_last else 0
+                seg_this_pct = (seg_this / deluxe_combined_this) * 100 if deluxe_combined_this else 0
+            else:
+                seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
+                seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
             
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td></td></tr>'
             
@@ -247,8 +255,13 @@ def generate_html_table(df, metric_type="Volume"):
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
-                b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
-                b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
+                if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
+                    b_last_pct = (row["Last Month"] / deluxe_combined_last) * 100 if deluxe_combined_last else 0
+                    b_this_pct = (row["This Month"] / deluxe_combined_this) * 100 if deluxe_combined_this else 0
+                else:
+                    b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
+                    b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
+                
                 b_growth = b_this_pct - b_last_pct
                 
                 growth_str = f"{b_growth:,.1f}%" if is_marked else ""
