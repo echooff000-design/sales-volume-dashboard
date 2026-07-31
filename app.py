@@ -145,9 +145,14 @@ df_target = dfs["Target Data"].copy()
 for d in [df_this, df_last, df_target]:
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
-    # Merge Deluxe Plus-Whisky rows directly into Deluxe-Whisky within the source data sheets
+    
+    # Merge Deluxe Plus-Whisky rows directly into Deluxe-Whisky
     if "Segment" in d.columns:
         d["Segment"] = d["Segment"].replace({"Deluxe Plus-Whisky": "Deluxe-Whisky"})
+    
+    # Merge IBW volume into IBDC directly in source data
+    if "Brand" in d.columns:
+        d["Brand"] = d["Brand"].replace({"IBW": "IBDC"})
 
 df_this["Metric"] = "This Month"
 df_last["Metric"] = "Last Month"
@@ -187,9 +192,10 @@ explicit_seg_order = [
     "Semi Premium-Brandy", "Single Malt-Scotch"
 ]
 
+# IBDC placed first under Deluxe-Whisky, IBW completely removed
 explicit_brand_order = [
-    "IBW", "N1WSUP", "OCBL", 
-    "IBDC", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak", 
+    "IBDC", "N1WSUP", "OCBL", 
+    "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak", 
     "MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", 
     "BLGLM", "BLGOR", "Big Ben", "Blue Riband", 
     "Monarch", 
@@ -282,7 +288,7 @@ def generate_html_table(df, metric_type="Volume"):
     gt_target_vol = merged["Target"].sum()
     gt_this_vol = merged["This Month"].sum()
     
-    marked_brands = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
+    marked_brands = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
     
     marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
