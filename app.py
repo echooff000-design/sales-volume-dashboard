@@ -6,34 +6,62 @@ import io
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- CUSTOM ATTRACTIVE LOGIN & UI STYLING ---
+# --- MODERN PREMIUM LOGIN & UI STYLING ---
 st.markdown("""
     <style>
-    /* Main Background & Font Styling */
+    /* Sleek Background Theme */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
     }
 
-    /* Form input fields */
+    /* Modern Glassmorphism Login Container */
+    .login-container {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 40px;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        text-align: center;
+    }
+
+    /* Custom Input Labels */
+    .stTextInput label {
+        color: #94a3b8 !important;
+        font-weight: 500;
+        font-size: 13px;
+    }
+
+    /* Modern Dark Theme Inputs */
     .stTextInput input {
-        border-radius: 8px !important;
-        border: 1px solid #d1d5db !important;
-        padding: 10px 12px !important;
+        background-color: rgba(15, 23, 42, 0.6) !important;
+        color: #f8fafc !important;
+        border-radius: 10px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 12px 14px !important;
+        transition: all 0.3s ease;
+    }
+    .stTextInput input:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     }
 
-    /* Login Button Styling */
+    /* Premium Action Button */
     .stButton button {
         width: 100%;
-        background-color: #1e3a8a;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
-        border-radius: 8px;
-        font-weight: bold;
-        padding: 10px;
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 12px;
         border: none;
-        transition: background 0.3s ease;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        transition: all 0.3s ease;
     }
     .stButton button:hover {
-        background-color: #1d4ed8;
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
         color: white;
     }
 
@@ -120,41 +148,41 @@ if "authenticated" not in st.session_state:
     st.session_state["user_name"] = ""
 
 if not st.session_state["authenticated"]:
-    col1, col2, col3 = st.columns([1, 1.1, 1])
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-        with st.container():
-            st.markdown("""
-                <div style='background: white; padding: 35px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); text-align: center;'>
-            """, unsafe_allow_html=True)
+        st.markdown("<div style='height: 50px;'><div>", unsafe_allow_html=True)
+        
+        # Clean modern wrapper card layout
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
+        
+        try:
+            st.image("logo.png", width=95)
+        except Exception:
+            pass
             
-            try:
-                st.image("logo.png", width=90)
-            except Exception:
-                pass
-                
-            st.markdown("<h2 style='color: #1e3a8a; margin-bottom: 5px; font-size: 24px;'>Welcome Back</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #6b7280; font-size: 14px; margin-bottom: 25px;'>Sign in to access WB Sale Data Dashboard</p>", unsafe_allow_html=True)
+        st.markdown("<h2 style='color: #f8fafc; margin-top: 15px; margin-bottom: 5px; font-size: 24px; font-weight: 700;'>Welcome Back</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 30px;'>Sign in to access WB Sale Data Dashboard</p>", unsafe_allow_html=True)
+        
+        with st.form("login_form"):
+            input_user = st.text_input("User ID", placeholder="Enter your User ID")
+            input_pass = st.text_input("Password", type="password", placeholder="Enter your password")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            submit_btn = st.form_submit_button("Sign In")
             
-            with st.form("login_form"):
-                input_user = st.text_input("User ID", placeholder="Enter your User ID")
-                input_pass = st.text_input("Password", type="password", placeholder="Enter your password")
-                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                submit_btn = st.form_submit_button("Sign In")
+            if submit_btn:
+                user_match = df_users[
+                    (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
+                    (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
+                ]
                 
-                if submit_btn:
-                    user_match = df_users[
-                        (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
-                        (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
-                    ]
-                    
-                    if not user_match.empty:
-                        st.session_state["authenticated"] = True
-                        st.session_state["user_name"] = user_match.iloc[0]["Name"]
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid User ID or Password")
-            st.markdown("</div>", unsafe_allow_html=True)
+                if not user_match.empty:
+                    st.session_state["authenticated"] = True
+                    st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid User ID or Password")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 # --- CUSTOM TITLE WITH LOGO & LOGOUT ---
