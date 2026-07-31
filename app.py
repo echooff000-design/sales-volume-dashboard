@@ -6,78 +6,6 @@ import io
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- MODERN PREMIUM LOGIN & UI STYLING ---
-st.markdown("""
-    <style>
-    /* Sleek Background Theme */
-    .stApp {
-        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-    }
-
-    /* Modern Glassmorphism Login Container */
-    .login-container {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 40px;
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        text-align: center;
-    }
-
-    /* Custom Input Labels */
-    .stTextInput label {
-        color: #94a3b8 !important;
-        font-weight: 500;
-        font-size: 13px;
-    }
-
-    /* Modern Dark Theme Inputs */
-    .stTextInput input {
-        background-color: rgba(15, 23, 42, 0.6) !important;
-        color: #f8fafc !important;
-        border-radius: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        padding: 12px 14px !important;
-        transition: all 0.3s ease;
-    }
-    .stTextInput input:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    }
-
-    /* Premium Action Button */
-    .stButton button {
-        width: 100%;
-        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-        color: white;
-        border-radius: 10px;
-        font-weight: 600;
-        padding: 12px;
-        border: none;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        transition: all 0.3s ease;
-    }
-    .stButton button:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-        color: white;
-    }
-
-    /* Tables */
-    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-    .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
-    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
-    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }
-    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }
-    .brand-row { background-color: #FFFFFF; }
-    .brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }
-    .seg-col-text { text-align: left !important; line-height: 1.2; }
-    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }
-    </style>
-""", unsafe_allow_html=True)
-
 # --- HIDE STREAMLIT BRANDING ---
 hide_streamlit_style = """
             <style>
@@ -148,22 +76,35 @@ if "authenticated" not in st.session_state:
     st.session_state["user_name"] = ""
 
 if not st.session_state["authenticated"]:
+    # DYNAMIC CSS FOR LOGIN PAGE ONLY
+    st.markdown("""
+        <style>
+        .stApp { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
+        [data-testid="stForm"] { background: rgba(255, 255, 255, 0.03) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
+        .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
+        .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; transition: all 0.3s ease; }
+        .stTextInput input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .stButton button { width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 10px; font-weight: 600; padding: 12px; border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); transition: all 0.3s ease; }
+        .stButton button:hover { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4); color: white; }
+        </style>
+    """, unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.markdown("<div style='height: 50px;'><div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
         
-        # Clean modern wrapper card layout
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        
-        try:
-            st.image("logo.png", width=95)
-        except Exception:
-            pass
-            
-        st.markdown("<h2 style='color: #f8fafc; margin-top: 15px; margin-bottom: 5px; font-size: 24px; font-weight: 700;'>Welcome Back</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 30px;'>Sign in to access WB Sale Data Dashboard</p>", unsafe_allow_html=True)
-        
+        # Logo and text are now integrated INSIDE the form container
         with st.form("login_form"):
+            col_img1, col_img2, col_img3 = st.columns([1.5, 1, 1.5])
+            with col_img2:
+                try:
+                    st.image("logo.png", use_container_width=True)
+                except Exception:
+                    pass
+                    
+            st.markdown("<h2 style='color: #f8fafc; text-align: center; margin-top: 5px; margin-bottom: 5px; font-size: 24px; font-weight: 700;'>Welcome Back</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #94a3b8; text-align: center; font-size: 13px; margin-bottom: 25px;'>Sign in to access WB Sale Data Dashboard</p>", unsafe_allow_html=True)
+            
             input_user = st.text_input("User ID", placeholder="Enter your User ID")
             input_pass = st.text_input("Password", type="password", placeholder="Enter your password")
             st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -181,9 +122,23 @@ if not st.session_state["authenticated"]:
                     st.rerun()
                 else:
                     st.error("❌ Invalid User ID or Password")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
+
+# DYNAMIC CSS FOR MAIN DASHBOARD ONLY
+st.markdown("""
+    <style>
+    .stApp { background-color: #f8fafc; }
+    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
+    .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
+    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }
+    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }
+    .brand-row { background-color: #FFFFFF; }
+    .brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }
+    .seg-col-text { text-align: left !important; line-height: 1.2; }
+    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- CUSTOM TITLE WITH LOGO & LOGOUT ---
 col_logo, col_title, col_logout = st.columns([1, 5, 2])
