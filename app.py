@@ -76,7 +76,7 @@ if "authenticated" not in st.session_state:
     st.session_state["user_name"] = ""
 
 if not st.session_state["authenticated"]:
-    # DYNAMIC CSS FOR LOGIN PAGE ONLY
+    # STRICT LOGIN-ONLY STYLING
     st.markdown("""
         <style>
         .stApp { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
@@ -93,7 +93,6 @@ if not st.session_state["authenticated"]:
     with col2:
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
         
-        # Logo and text are now integrated INSIDE the form container
         with st.form("login_form"):
             col_img1, col_img2, col_img3 = st.columns([1.5, 1, 1.5])
             with col_img2:
@@ -124,10 +123,12 @@ if not st.session_state["authenticated"]:
                     st.error("❌ Invalid User ID or Password")
     st.stop()
 
-# DYNAMIC CSS FOR MAIN DASHBOARD ONLY
+# --- MAIN DASHBOARD STYLING (CLEAN LIGHT THEME) ---
 st.markdown("""
     <style>
-    .stApp { background-color: #f8fafc; }
+    .stApp { background-color: #ffffff; }
+    /* Reset label colors for dashboard filters so they are clearly visible */
+    [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
     .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
     .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
@@ -148,9 +149,9 @@ with col_logo:
     except Exception:
         st.warning("logo.png missing")
 with col_title:
-    st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-top: 10px; font-size: 22px; color: #0f172a;'>WB Sale Data</h3>", unsafe_allow_html=True)
 with col_logout:
-    st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #334155;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
     if st.button("Logout"):
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
