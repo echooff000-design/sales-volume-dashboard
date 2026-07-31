@@ -15,29 +15,8 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- CUSTOM TITLE WITH LOGO ---
-col_logo, col_title = st.columns([1, 6])
-with col_logo:
-    try:
-        st.image("logo.png", width=60)
-    except Exception:
-        st.warning("logo.png missing")
-with col_title:
-    st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
-
 # --- 2. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
-
-st.sidebar.header("📁 Data Source")
-
-# --- NAVIGATION LINK IN SIDEBAR ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
-st.sidebar.markdown("---")
-
-if st.sidebar.button("🔄 Refresh Data Now"):
-    st.cache_data.clear()
-    st.sidebar.success("Cache cleared! Fetching newest data...")
 
 @st.cache_data(ttl=300)
 def load_data_from_url(url):
@@ -58,20 +37,88 @@ def load_data_from_url(url):
     except Exception as e:
         return None, str(e)
 
-with st.spinner("Fetching and processing sheets from SharePoint..."):
+with st.spinner("Connecting to database..."):
     dfs, error = load_data_from_url(RAW_SHAREPOINT_URL)
 
 if error or dfs is None:
-    st.sidebar.warning("⚠️ Could not auto-fetch from link. Please upload manually.")
-    uploaded_file = st.sidebar.file_uploader("Upload Excel File", type=["xlsx", "xls", "xlsb"])
-    if uploaded_file is not None:
-        engine = "pyxlsb" if uploaded_file.name.endswith(".xlsb") else None
-        dfs = pd.read_excel(uploaded_file, sheet_name=None, engine=engine)
-    else:
-        st.error(f"Unable to load data: {error}")
-        st.stop()
+    st.error(f"⚠️ Unable to load data: {error}")
+    st.stop()
 
-# --- 3. FETCH DATA INDIVIDUALLY FROM SHEETS ---
+# --- 3. LOGIN CREDENTIAL SYSTEM ---
+if "Users" not in dfs:
+    st.error("❌ Could not find the 'Users' sheet in your Excel file. Please add it with columns: Name, user_id, password.")
+    st.stop()
+
+df_users = dfs["Users"].copy()
+df_users.columns = df_users.columns.astype(str).str.strip()
+
+if "user_id" not in df_users.columns or "password" not in df_users.columns or "Name" not in df_users.columns:
+    st.error("❌ The 'Users' sheet must contain 'Name', 'user_id', and 'password' columns.")
+    st.stop()
+
+# Initialize session state for authentication
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+    st.session_state["user_name"] = ""
+
+if not st.session_state["authenticated"]:
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        try:
+            st.image("logo.png", width=100)
+        except Exception:
+            pass
+        st.markdown("### 🔐 Login to WB Sale Data")
+        
+        with st.form("login_form"):
+            input_user = st.text_input("User ID")
+            input_pass = st.text_input("Password", type="password")
+            submit_btn = st.form_submit_button("Login")
+            
+            if submit_btn:
+                # Clean strings for validation match
+                user_match = df_users[
+                    (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
+                    (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
+                ]
+                
+                if not user_match.empty:
+                    st.session_state["authenticated"] = True
+                    st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid User ID or Password")
+    st.stop()
+
+# --- CUSTOM TITLE WITH LOGO & LOGOUT ---
+col_logo, col_title, col_logout = st.columns([1, 5, 2])
+with col_logo:
+    try:
+        st.image("logo.png", width=60)
+    except Exception:
+        st.warning("logo.png missing")
+with col_title:
+    st.markdown("<h3 style='margin-top: 10px; font-size: 22px;'>WB Sale Data</h3>", unsafe_allow_html=True)
+with col_logout:
+    st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
+    if st.button("Logout"):
+        st.session_state["authenticated"] = False
+        st.session_state["user_name"] = ""
+        st.rerun()
+
+st.sidebar.header("📁 Data Source")
+
+# --- NAVIGATION LINK IN SIDEBAR ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
+st.sidebar.markdown("---")
+
+if st.sidebar.button("🔄 Refresh Data Now"):
+    st.cache_data.clear()
+    st.sidebar.success("Cache cleared! Fetching newest data...")
+
+# --- 4. FETCH DATA INDIVIDUALLY FROM SHEETS ---
 required_sheets = ["This Month", "Last Month", "Target Data"]
 for sheet in required_sheets:
     if sheet not in dfs:
@@ -104,7 +151,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
 
-# --- 4. EXACT ORDER MAPPING & DATA CONVERSION ---
+# --- 5. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
 for col in num_cols:
     if col not in df_raw.columns:
@@ -145,7 +192,7 @@ df_raw[brand_col] = pd.Categorical(df_raw[brand_col], categories=final_brand_ord
 
 master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_values(by=[seg_col, brand_col])
 
-# --- 5. CASCADING SIDEBAR FILTERS ---
+# --- 6. CASCADING SIDEBAR FILTERS ---
 st.subheader("🔍 Filters")
 col1, col2, col3, col4 = st.columns(4)
 
@@ -186,7 +233,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. HTML TABLE GENERATORS ---
+# --- 7. HTML TABLE GENERATORS (WITH COMBINED DELUXE & DELUXE PLUS DENOMINATOR) ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -224,6 +271,14 @@ def generate_html_table(df, metric_type="Volume"):
     marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
 
+    # Pre-calculate combined Deluxe & Deluxe Plus denominators for Ms%
+    deluxe_combined_last = 0
+    deluxe_combined_this = 0
+    if metric_type == "Ms%":
+        deluxe_comb_data = merged[merged[seg_col].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])]
+        deluxe_combined_last = deluxe_comb_data["Last Month"].sum()
+        deluxe_combined_this = deluxe_comb_data["This Month"].sum()
+
     for segment, seg_data in merged.groupby(seg_col, sort=False, observed=False):
         seg_last = seg_data["Last Month"].sum()
         seg_target = seg_data["Target"].sum()
@@ -241,8 +296,14 @@ def generate_html_table(df, metric_type="Volume"):
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
 
         else: 
-            seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
-            seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
+            # Use combined denominator for Deluxe & Deluxe Plus segments, standard global totals for others
+            if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
+                seg_last_pct = (seg_last / deluxe_combined_last) * 100 if deluxe_combined_last else 0
+                seg_this_pct = (seg_this / deluxe_combined_this) * 100 if deluxe_combined_this else 0
+            else:
+                seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
+                seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
+                
             seg_growth = seg_this_pct - seg_last_pct
             
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
@@ -252,8 +313,13 @@ def generate_html_table(df, metric_type="Volume"):
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
-                b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
-                b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
+                if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
+                    b_last_pct = (row["Last Month"] / deluxe_combined_last) * 100 if deluxe_combined_last else 0
+                    b_this_pct = (row["This Month"] / deluxe_combined_this) * 100 if deluxe_combined_this else 0
+                else:
+                    b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
+                    b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
+                    
                 b_growth = b_this_pct - b_last_pct
                 
                 growth_str = f"{b_growth:,.1f}%"
@@ -264,71 +330,6 @@ def generate_html_table(df, metric_type="Volume"):
     else:
         html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
         
-    html += '</tbody></table></div>'
-    return html
-
-def generate_combined_deluxe_table(df):
-    if not df.empty:
-        df = df.copy()
-        grouped = df.groupby([seg_col, brand_col], as_index=False, observed=False)[["Last Month", "Target", "This Month"]].sum()
-    else:
-        grouped = pd.DataFrame(columns=[seg_col, brand_col, "Last Month", "Target", "This Month"])
-
-    merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
-    deluxe_comb_data = merged[merged[seg_col].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])]
-
-    comb_last_total = deluxe_comb_data["Last Month"].sum()
-    comb_this_total = deluxe_comb_data["This Month"].sum()
-
-    html = "<style>"
-    html += ".table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }"
-    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
-    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }"
-    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
-    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
-    html += ".brand-row { background-color: #FFFFFF; }"
-    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
-    html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
-    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
-    html += "</style>"
-    
-    html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
-    html += '<thead><tr><th class="seg-col-text">Combined Deluxe & Deluxe Plus</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody>'
-
-    marked_brands = ['IBW', 'IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
-
-    for segment, seg_data in deluxe_comb_data.groupby(seg_col, sort=False, observed=False):
-        seg_last = seg_data["Last Month"].sum()
-        seg_this = seg_data["This Month"].sum()
-        
-        if seg_last == 0 and seg_this == 0:
-            continue
-
-        seg_last_pct = (seg_last / comb_last_total) * 100 if comb_last_total else 0
-        seg_this_pct = (seg_this / comb_this_total) * 100 if comb_this_total else 0
-        seg_growth = seg_this_pct - seg_last_pct
-        
-        html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
-        
-        for _, row in seg_data.iterrows():
-            b_last = row["Last Month"]
-            b_this = row["This Month"]
-            
-            if b_last == 0 and b_this == 0:
-                continue
-
-            b_name = row[brand_col]
-            is_marked = b_name in marked_brands
-            bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
-            
-            b_last_pct = (b_last / comb_last_total) * 100 if comb_last_total else 0
-            b_this_pct = (b_this / comb_this_total) * 100 if comb_this_total else 0
-            b_growth = b_this_pct - b_last_pct
-            
-            growth_str = f"{b_growth:,.1f}%"
-            html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
-
-    html += f'<tr class="grand-total-row"><td class="seg-col-text">Combined Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
     html += '</tbody></table></div>'
     return html
 
@@ -344,8 +345,3 @@ with tab1:
 with tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
     st.write(html_ms, unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔗 Combined Deluxe & Deluxe Plus Market Share")
-    html_combined = generate_combined_deluxe_table(filtered_df)
-    st.write(html_combined, unsafe_allow_html=True)
