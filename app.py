@@ -13,15 +13,6 @@ st.markdown("""
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     }
-    
-    /* Login Card Container Styling */
-    .login-card {
-        background: #ffffff;
-        padding: 40px;
-        border-radius: 16px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        text-align: center;
-    }
 
     /* Form input fields */
     .stTextInput input {
