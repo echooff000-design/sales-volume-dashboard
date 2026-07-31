@@ -6,6 +6,59 @@ import io
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
+# --- CUSTOM ATTRACTIVE LOGIN & UI STYLING ---
+st.markdown("""
+    <style>
+    /* Main Background & Font Styling */
+    .stApp {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    
+    /* Login Card Container Styling */
+    .login-card {
+        background: #ffffff;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    /* Form input fields */
+    .stTextInput input {
+        border-radius: 8px !important;
+        border: 1px solid #d1d5db !important;
+        padding: 10px 12px !important;
+    }
+
+    /* Login Button Styling */
+    .stButton button {
+        width: 100%;
+        background-color: #1e3a8a;
+        color: white;
+        border-radius: 8px;
+        font-weight: bold;
+        padding: 10px;
+        border: none;
+        transition: background 0.3s ease;
+    }
+    .stButton button:hover {
+        background-color: #1d4ed8;
+        color: white;
+    }
+
+    /* Tables */
+    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
+    .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
+    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }
+    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }
+    .brand-row { background-color: #FFFFFF; }
+    .brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }
+    .seg-col-text { text-align: left !important; line-height: 1.2; }
+    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- HIDE STREAMLIT BRANDING ---
 hide_streamlit_style = """
             <style>
@@ -76,32 +129,41 @@ if "authenticated" not in st.session_state:
     st.session_state["user_name"] = ""
 
 if not st.session_state["authenticated"]:
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2, col3 = st.columns([1, 1.1, 1])
     with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        try:
-            st.image("logo.png", width=100)
-        except Exception:
-            pass
-        st.markdown("### 🔐 Login to WB Sale Data")
-        
-        with st.form("login_form"):
-            input_user = st.text_input("User ID")
-            input_pass = st.text_input("Password", type="password")
-            submit_btn = st.form_submit_button("Login")
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        with st.container():
+            st.markdown("""
+                <div style='background: white; padding: 35px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); text-align: center;'>
+            """, unsafe_allow_html=True)
             
-            if submit_btn:
-                user_match = df_users[
-                    (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
-                    (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
-                ]
+            try:
+                st.image("logo.png", width=90)
+            except Exception:
+                pass
                 
-                if not user_match.empty:
-                    st.session_state["authenticated"] = True
-                    st.session_state["user_name"] = user_match.iloc[0]["Name"]
-                    st.rerun()
-                else:
-                    st.error("❌ Invalid User ID or Password")
+            st.markdown("<h2 style='color: #1e3a8a; margin-bottom: 5px; font-size: 24px;'>Welcome Back</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #6b7280; font-size: 14px; margin-bottom: 25px;'>Sign in to access WB Sale Data Dashboard</p>", unsafe_allow_html=True)
+            
+            with st.form("login_form"):
+                input_user = st.text_input("User ID", placeholder="Enter your User ID")
+                input_pass = st.text_input("Password", type="password", placeholder="Enter your password")
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                submit_btn = st.form_submit_button("Sign In")
+                
+                if submit_btn:
+                    user_match = df_users[
+                        (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
+                        (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
+                    ]
+                    
+                    if not user_match.empty:
+                        st.session_state["authenticated"] = True
+                        st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid User ID or Password")
+            st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # --- CUSTOM TITLE WITH LOGO & LOGOUT ---
@@ -146,11 +208,9 @@ for d in [df_this, df_last, df_target]:
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
     
-    # Merge Deluxe Plus-Whisky rows directly into Deluxe-Whisky
     if "Segment" in d.columns:
         d["Segment"] = d["Segment"].replace({"Deluxe Plus-Whisky": "Deluxe-Whisky"})
     
-    # Merge IBW volume into IBDC directly in source data
     if "Brand" in d.columns:
         d["Brand"] = d["Brand"].replace({"IBW": "IBDC"})
 
@@ -192,7 +252,6 @@ explicit_seg_order = [
     "Semi Premium-Brandy", "Single Malt-Scotch"
 ]
 
-# IBDC placed first under Deluxe-Whisky, IBW completely removed
 explicit_brand_order = [
     "IBDC", "N1WSUP", "OCBL", 
     "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak", 
@@ -265,19 +324,7 @@ def generate_html_table(df, metric_type="Volume"):
 
     merged = pd.merge(master_brands, grouped, on=[seg_col, brand_col], how="left").fillna(0)
 
-    html = "<style>"
-    html += ".table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }"
-    html += ".custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }"
-    html += ".custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }"
-    html += ".custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }"
-    html += ".subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }"
-    html += ".brand-row { background-color: #FFFFFF; }"
-    html += ".brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }"
-    html += ".seg-col-text { text-align: left !important; line-height: 1.2; }"
-    html += ".grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }"
-    html += "</style>"
-    
-    html += '<div class="table-wrapper"><table class="custom-dashboard-table">'
+    html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     
     if metric_type == "Volume":
         html += '<thead><tr><th class="seg-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody>'
