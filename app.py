@@ -50,11 +50,30 @@ if "Users" not in dfs:
     st.stop()
 
 df_users = dfs["Users"].copy()
-df_users.columns = df_users.columns.astype(str).str.strip()
 
-if "user_id" not in df_users.columns or "password" not in df_users.columns or "Name" not in df_users.columns:
-    st.error("❌ The 'Users' sheet must contain 'Name', 'user_id', and 'password' columns.")
+# Clean all column names (removes spaces and standardizes matching)
+df_users.columns = df_users.columns.astype(str).str.strip().str.lower()
+
+# Flexible check mapping
+col_map = {}
+for col in df_users.columns:
+    if "name" in col:
+        col_map["Name"] = col
+    elif "user" in col or "id" in col:
+        col_map["user_id"] = col
+    elif "pass" in col:
+        col_map["password"] = col
+
+if "Name" not in col_map or "user_id" not in col_map or "password" not in col_map:
+    st.error(f"❌ The 'Users' sheet columns were detected as: {list(dfs['Users'].columns)}. Please ensure your Excel columns are named: Name, user_id, password.")
     st.stop()
+
+# Rename columns safely for internal use
+df_users = df_users.rename(columns={
+    col_map["Name"]: "Name",
+    col_map["user_id"]: "user_id",
+    col_map["password"]: "password"
+})
 
 # Initialize session state for authentication
 if "authenticated" not in st.session_state:
@@ -77,7 +96,6 @@ if not st.session_state["authenticated"]:
             submit_btn = st.form_submit_button("Login")
             
             if submit_btn:
-                # Clean strings for validation match
                 user_match = df_users[
                     (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
                     (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
