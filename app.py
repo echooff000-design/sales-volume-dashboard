@@ -50,11 +50,8 @@ if "Users" not in dfs:
     st.stop()
 
 df_users = dfs["Users"].copy()
-
-# Clean all column names (removes spaces and standardizes matching)
 df_users.columns = df_users.columns.astype(str).str.strip().str.lower()
 
-# Flexible check mapping
 col_map = {}
 for col in df_users.columns:
     if "name" in col:
@@ -68,14 +65,12 @@ if "Name" not in col_map or "user_id" not in col_map or "password" not in col_ma
     st.error(f"❌ The 'Users' sheet columns were detected as: {list(dfs['Users'].columns)}. Please ensure your Excel columns are named: Name, user_id, password.")
     st.stop()
 
-# Rename columns safely for internal use
 df_users = df_users.rename(columns={
     col_map["Name"]: "Name",
     col_map["user_id"]: "user_id",
     col_map["password"]: "password"
 })
 
-# Initialize session state for authentication
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
     st.session_state["user_name"] = ""
@@ -150,6 +145,9 @@ df_target = dfs["Target Data"].copy()
 for d in [df_this, df_last, df_target]:
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
+    # Merge Deluxe Plus-Whisky rows directly into Deluxe-Whisky within the source data sheets
+    if "Segment" in d.columns:
+        d["Segment"] = d["Segment"].replace({"Deluxe Plus-Whisky": "Deluxe-Whisky"})
 
 df_this["Metric"] = "This Month"
 df_last["Metric"] = "Last Month"
@@ -184,7 +182,7 @@ if not seg_col or not brand_col:
     st.stop()
 
 explicit_seg_order = [
-    "Deluxe-Whisky", "Deluxe Plus-Whisky", "Semi Premium-Whisky", 
+    "Deluxe-Whisky", "Semi Premium-Whisky", 
     "Deluxe-Gin", "Premium-Brandy", "Premium-Gin", 
     "Semi Premium-Brandy", "Single Malt-Scotch"
 ]
@@ -251,7 +249,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. HTML TABLE GENERATORS (WITH COMBINED DELUXE & DELUXE PLUS DENOMINATOR) ---
+# --- 7. HTML TABLE GENERATORS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -289,14 +287,6 @@ def generate_html_table(df, metric_type="Volume"):
     marked_data = merged[merged[brand_col].isin(marked_brands)]
     gt_bal_vol = marked_data["Target"].sum() - marked_data["This Month"].sum()
 
-    # Pre-calculate combined Deluxe & Deluxe Plus denominators for Ms%
-    deluxe_combined_last = 0
-    deluxe_combined_this = 0
-    if metric_type == "Ms%":
-        deluxe_comb_data = merged[merged[seg_col].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])]
-        deluxe_combined_last = deluxe_comb_data["Last Month"].sum()
-        deluxe_combined_this = deluxe_comb_data["This Month"].sum()
-
     for segment, seg_data in merged.groupby(seg_col, sort=False, observed=False):
         seg_last = seg_data["Last Month"].sum()
         seg_target = seg_data["Target"].sum()
@@ -314,14 +304,8 @@ def generate_html_table(df, metric_type="Volume"):
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
 
         else: 
-            # Use combined denominator for Deluxe & Deluxe Plus segments, standard global totals for others
-            if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
-                seg_last_pct = (seg_last / deluxe_combined_last) * 100 if deluxe_combined_last else 0
-                seg_this_pct = (seg_this / deluxe_combined_this) * 100 if deluxe_combined_this else 0
-            else:
-                seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
-                seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
-                
+            seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
+            seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
             seg_growth = seg_this_pct - seg_last_pct
             
             html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
@@ -331,13 +315,8 @@ def generate_html_table(df, metric_type="Volume"):
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
-                if segment in ["Deluxe-Whisky", "Deluxe Plus-Whisky"]:
-                    b_last_pct = (row["Last Month"] / deluxe_combined_last) * 100 if deluxe_combined_last else 0
-                    b_this_pct = (row["This Month"] / deluxe_combined_this) * 100 if deluxe_combined_this else 0
-                else:
-                    b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
-                    b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
-                    
+                b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
+                b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
                 
                 growth_str = f"{b_growth:,.1f}%"
