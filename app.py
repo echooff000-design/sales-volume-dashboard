@@ -85,6 +85,8 @@ if not st.session_state["authenticated"]:
         <style>
         .stApp { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
         [data-testid="stForm"] { background: rgba(255, 255, 255, 0.03) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
+        /* Reduce login logo size by 50% */
+        [data-testid="stForm"] img { max-width: 120px !important; display: block; margin: 0 auto; }
         .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
         .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; transition: all 0.3s ease; }
         .stTextInput input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
@@ -150,18 +152,21 @@ st.markdown("""
 
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
-    /* --- TAB TEXT COLORS --- */
+    /* --- TAB TEXT COLORS: INACTIVE BLACK, ACTIVE RED --- */
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
     .stTabs [data-baseweb="tab"] p {
-        color: #1e293b !important;
+        color: #000000 !important;
         font-weight: 600 !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
     .stTabs [data-baseweb="tab"][aria-selected="true"] span,
     .stTabs [data-baseweb="tab"][aria-selected="true"] p {
-        color: #2563eb !important;
+        color: #ef4444 !important;
         font-weight: 700 !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: #ef4444 !important;
     }
 
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
