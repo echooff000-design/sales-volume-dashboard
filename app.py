@@ -198,16 +198,6 @@ if st.sidebar.button("🔄 Refresh Data Now"):
     st.sidebar.success("Cache cleared! Fetching newest data...")
 
 st.sidebar.markdown("---")
-
-# --- SIDEBAR RADIO SUB-NAVIGATION FOR DASHBOARD ---
-st.sidebar.markdown("📊 **Dashboard Views**")
-dashboard_sub_view = st.sidebar.radio(
-    "Select Dashboard View",
-    ["Target vs Ach", "MS% Details", "WOD Details"],
-    label_visibility="collapsed"
-)
-
-st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
 if os.path.exists("login_logs.csv"):
     with open("login_logs.csv", "rb") as file:
