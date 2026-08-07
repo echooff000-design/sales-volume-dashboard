@@ -34,13 +34,17 @@ def load_data_from_url(url):
                 dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="openpyxl")
             except Exception:
                 dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
-            
-        return dfs, None
+        
+        # Capture the exact time the data was fetched in IST
+        ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        fetch_time = datetime.datetime.now(ist_timezone).strftime("%d %b %Y, %I:%M %p")
+        
+        return dfs, None, fetch_time
     except Exception as e:
-        return None, str(e)
+        return None, str(e), None
 
 with st.spinner("Connecting to database..."):
-    dfs, error = load_data_from_url(RAW_SHAREPOINT_URL)
+    dfs, error, last_update = load_data_from_url(RAW_SHAREPOINT_URL)
 
 if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
@@ -182,6 +186,8 @@ with col_logout:
         st.rerun()
 
 st.sidebar.header("📁 Data Source")
+if last_update:
+    st.sidebar.caption(f"🕒 **Last Synced:** {last_update}")
 
 # --- DOWNLOAD LOGS BUTTON IN SIDEBAR ---
 st.sidebar.markdown("---")
