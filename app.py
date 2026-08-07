@@ -3,8 +3,7 @@ import pandas as pd
 import requests
 import io
 import datetime
-import pytz
-from streamlit_gsheets import GSheetsConnection
+import os
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
@@ -122,22 +121,24 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
                     
+                    # --- LOCAL CSV CONTINUOUS LOGGING (NO PYTZ NEEDED) ---
                     try:
-                        conn = st.connection("gsheets", type=GSheetsConnection)
-                        LOG_SHEET_URL = "https://docs.google.com/spreadsheets/d/1j7jmyjjz2_bWJ-s7rZmtj52WS7XzrrVfNU4wnZ9mg9E/edit?usp=sharing"
-                        ist_timezone = pytz.timezone('Asia/Kolkata')
+                        # Use standard datetime to calculate IST (+5:30)
+                        ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         current_time = datetime.datetime.now(ist_timezone).strftime("%Y-%m-%d %I:%M:%S %p")
                         
-                        new_log = pd.DataFrame([{
+                        log_data = pd.DataFrame([{
                             "Name": st.session_state["user_name"],
                             "User ID": input_user,
                             "Login Time (IST)": current_time
                         }])
                         
-                        existing_data = conn.read(spreadsheet=LOG_SHEET_URL, usecols=[0, 1, 2])
-                        updated_data = pd.concat([existing_data, new_log], ignore_index=True)
-                        conn.update(spreadsheet=LOG_SHEET_URL, data=updated_data)
-                        
+                        csv_file = "login_logs.csv"
+                        if not os.path.exists(csv_file):
+                            log_data.to_csv(csv_file, index=False)
+                        else:
+                            log_data.to_csv(csv_file, mode='a', header=False, index=False)
+                            
                     except Exception as e:
                         print(f"Log error: {e}")
                     
@@ -182,6 +183,20 @@ with col_logout:
 
 st.sidebar.header("📁 Data Source")
 
+# --- DOWNLOAD LOGS BUTTON IN SIDEBAR ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("📋 **Admin Panel**")
+if os.path.exists("login_logs.csv"):
+    with open("login_logs.csv", "rb") as file:
+        st.sidebar.download_button(
+            label="📥 Download Login Logs",
+            data=file,
+            file_name="login_logs.csv",
+            mime="text/csv",
+        )
+else:
+    st.sidebar.info("No login logs yet.")
+
 # --- NAVIGATION LINK IN SIDEBAR ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
@@ -208,7 +223,6 @@ df_outlet.columns = df_outlet.columns.astype(str).str.strip()
 if "Outlet Nan" in df_outlet.columns:
     df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
 
-# Grab exactly Column H (Index 7) to act as the "Group" attribute
 if len(df_outlet.columns) > 7:
     group_col_name = df_outlet.columns[7]
     df_outlet.rename(columns={group_col_name: "Group"}, inplace=True)
@@ -216,7 +230,6 @@ else:
     if "Group" not in df_outlet.columns:
         df_outlet["Group"] = "Unassigned"
 
-# Create mapping dictionary based on LIC No or Outlet Name
 mapping = {}
 map_key = None
 if "LIC No" in df_outlet.columns:
@@ -226,7 +239,6 @@ elif "Outlet Name" in df_outlet.columns:
     mapping = dict(zip(df_outlet["Outlet Name"].astype(str).str.strip(), df_outlet["Group"].astype(str).str.strip()))
     map_key = "Outlet Name"
 
-# Format data and inject 'Group' mapping
 for d in [df_this, df_last, df_target]:
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
@@ -237,7 +249,6 @@ for d in [df_this, df_last, df_target]:
     if "Brand" in d.columns:
         d["Brand"] = d["Brand"].replace({"IBW": "IBDC"})
         
-    # Map the Group into the dataset
     if map_key and map_key in d.columns:
         d["Group"] = d[map_key].astype(str).str.strip().map(mapping).fillna("Unassigned")
     else:
@@ -304,7 +315,6 @@ master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_val
 
 # --- 6. CASCADING SIDEBAR FILTERS ---
 st.subheader("🔍 Filters")
-# Changed to 5 columns to accommodate the new Group filter!
 col1, col2, col3, col4, col5 = st.columns(5)
 
 temp_df = df_raw.copy()
