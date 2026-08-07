@@ -3,5 +3,3 @@ pandas
 requests
 openpyxl
 pyxlsb
-pytz
-st-gsheets
