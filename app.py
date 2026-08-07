@@ -35,7 +35,6 @@ def load_data_from_url(url):
             except Exception:
                 dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
         
-        # Capture the exact time the data was fetched in IST
         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
         fetch_time = datetime.datetime.now(ist_timezone).strftime("%d %b %Y, %I:%M %p")
         
@@ -125,9 +124,7 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
                     
-                    # --- LOCAL CSV CONTINUOUS LOGGING (NO PYTZ NEEDED) ---
                     try:
-                        # Use standard datetime to calculate IST (+5:30)
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         current_time = datetime.datetime.now(ist_timezone).strftime("%Y-%m-%d %I:%M:%S %p")
                         
@@ -155,7 +152,6 @@ if not st.session_state["authenticated"]:
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
-    /* Reset label colors for dashboard filters so they are clearly visible */
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
     .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
@@ -366,7 +362,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. HTML TABLE GENERATORS ---
+# --- 7. HTML TABLE GENERATORS WITH HIGHLIGHTS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -405,8 +401,18 @@ def generate_html_table(df, metric_type="Volume"):
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 
+                # Color Cues: Highlight shortfalls vs target in soft red, achievements in soft green
+                row_highlight = ''
+                if is_marked:
+                    target_val = row['Target']
+                    this_month_val = row['This Month']
+                    if this_month_val < target_val:
+                        row_highlight = 'background-color: #fde8e8; color: #9b1c1c;'  # Soft Red for shortfall
+                    else:
+                        row_highlight = 'background-color: #def7ec; color: #03543f;'  # Soft Green for target met
+                
                 bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
-                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap;">{int(row["This Month"]):,}</td><td style="white-space:nowrap;">{bal_str}</td></tr>'
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap; {row_highlight}">{int(row["This Month"]):,}</td><td style="white-space:nowrap; {row_highlight}">{bal_str}</td></tr>'
 
         else: 
             seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
@@ -424,8 +430,15 @@ def generate_html_table(df, metric_type="Volume"):
                 b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
                 
+                # Color Cues for Growth: Soft green for positive growth, soft red for negative growth
+                growth_highlight = ''
+                if b_growth > 0:
+                    growth_highlight = 'background-color: #def7ec; color: #03543f;'
+                elif b_growth < 0:
+                    growth_highlight = 'background-color: #fde8e8; color: #9b1c1c;'
+                
                 growth_str = f"{b_growth:,.1f}%"
-                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap;">{growth_str}</td></tr>'
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap; {growth_highlight}">{growth_str}</td></tr>'
 
     if metric_type == "Volume":
         html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">{int(gt_last_vol):,}</td><td style="white-space:nowrap;">{int(gt_target_vol):,}</td><td style="white-space:nowrap;">{int(gt_this_vol):,}</td><td style="white-space:nowrap;">{int(gt_bal_vol):,}</td></tr>'
