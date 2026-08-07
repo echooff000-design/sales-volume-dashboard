@@ -143,13 +143,17 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
-    /* --- CUSTOM TAB TEXT & ACTIVE COLORS (FORCED VISIBILITY) --- */
-    button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
-        color: #475569 !important; /* Inactive tab text color (Dark Slate) */
+    /* --- FORCED VISIBLE TAB TEXT COLORS --- */
+    .stTabs [data-baseweb="tab-list"] button div p, 
+    .stTabs [data-baseweb="tab-list"] button span,
+    .stTabs [data-baseweb="tab"] p {
+        color: #1e293b !important; /* Dark text for all tab labels */
         font-weight: 600 !important;
     }
-    button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
-        color: #2563eb !important; /* Active tab text color (Vibrant Blue) */
+    .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
+    .stTabs [data-baseweb="tab"][aria-selected="true"] span,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p {
+        color: #2563eb !important; /* Vibrant Blue for the active tab */
         font-weight: 700 !important;
     }
 
