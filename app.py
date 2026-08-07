@@ -138,7 +138,7 @@ if not st.session_state["authenticated"]:
                     st.error("❌ Invalid User ID or Password")
     st.stop()
 
-# --- MAIN DASHBOARD STYLING (DEEP BLUE THEME) ---
+# --- MAIN DASHBOARD STYLING (DEEP BLUE BACKGROUND, ORIGINAL WHITE TABLES) ---
 st.markdown("""
     <style>
     .stApp { background-color: #0f172a !important; }
@@ -161,16 +161,16 @@ st.markdown("""
         background-color: #ef4444 !important;
     }
 
-    /* --- COMPACT TABLE FONT & NO WRAPPING --- */
+    /* --- ORIGINAL WHITE TABLE STYLING & NO WRAPPING --- */
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse; font-family: sans-serif; background-color: #1e293b; color: #f8fafc; font-size: 8.5px; }
-    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #475569; padding: 3px 2px; text-align: center; white-space: nowrap !important; }
-    .custom-dashboard-table th { background-color: #334155; color: #f8fafc; font-weight: bold; border-bottom: 2px solid #64748b; font-size: 8px; white-space: nowrap !important; }
-    .subtotal-row { font-weight: bold; color: #f8fafc; background-color: #334155; font-size: 8px; }
-    .brand-row { background-color: #1e293b; color: #f8fafc; }
-    .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #f8fafc; }
-    .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #f8fafc; }
-    .grand-total-row { background-color: #334155; color: #f8fafc; font-weight: bold; font-size: 9px; border-top: 2px solid #64748b; white-space: nowrap !important; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 3px 2px; text-align: center; white-space: nowrap !important; }
+    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 8px; white-space: nowrap !important; }
+    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
+    .brand-row { background-color: #FFFFFF; color: #000000; }
+    .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #000000; }
+    .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #000000; }
+    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 9px; border-top: 2px solid #8EA9DB; white-space: nowrap !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -411,13 +411,13 @@ def generate_html_table(df, metric_type="Volume"):
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 is_marked = b_name in marked_brands
-                bg_style = 'background-color: #334155; font-weight: bold;' if is_marked else ''
+                bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 row_highlight = ''
                 if is_marked:
                     if row['This Month'] < row['Target']:
-                        row_highlight = 'background-color: #7f1d1d; color: #fca5a5;'
+                        row_highlight = 'background-color: #fde8e8; color: #9b1c1c;'
                     else:
-                        row_highlight = 'background-color: #064e3b; color: #6ee7b7;'
+                        row_highlight = 'background-color: #def7ec; color: #03543f;'
                 bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap; {row_highlight}">{int(row["This Month"]):,}</td><td style="white-space:nowrap; {row_highlight}">{bal_str}</td></tr>'
         else: 
@@ -428,15 +428,15 @@ def generate_html_table(df, metric_type="Volume"):
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 is_marked = b_name in marked_brands
-                bg_style = 'background-color: #334155; font-weight: bold;' if is_marked else ''
+                bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
                 b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
                 growth_highlight = ''
                 if b_growth > 0:
-                    growth_highlight = 'background-color: #064e3b; color: #6ee7b7;'
+                    growth_highlight = 'background-color: #def7ec; color: #03543f;'
                 elif b_growth < 0:
-                    growth_highlight = 'background-color: #7f1d1d; color: #fca5a5;'
+                    growth_highlight = 'background-color: #fde8e8; color: #9b1c1c;'
                 growth_str = f"{b_growth:,.1f}%"
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap; {growth_highlight}">{growth_str}</td></tr>'
 
@@ -569,8 +569,8 @@ def generate_hierarchy_table_2(df):
     wb_mhw_diff = wb_mhw_mtd - wb_mhw_lm
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
-    html += f'<td>{wb_ibdc_lm:.1f}%</td><td>{wb_ibdc_mtd:.1f}%</td><td style="color: {"#fca5a5" if wb_ibdc_diff < 0 else "#6ee7b7"};">{wb_ibdc_diff:+.1f}%</td>'
-    html += f'<td>{wb_mhw_lm:.1f}%</td><td>{wb_mhw_mtd:.1f}%</td><td style="color: {"#fca5a5" if wb_mhw_diff < 0 else "#6ee7b7"};">{wb_mhw_diff:+.1f}%</td></tr>'
+    html += f'<td>{wb_ibdc_lm:.1f}%</td><td>{wb_ibdc_mtd:.1f}%</td><td style="color: {"#9b1c1c" if wb_ibdc_diff < 0 else "#03543f"};">{wb_ibdc_diff:+.1f}%</td>'
+    html += f'<td>{wb_mhw_lm:.1f}%</td><td>{wb_mhw_mtd:.1f}%</td><td style="color: {"#9b1c1c" if wb_mhw_diff < 0 else "#03543f"};">{wb_mhw_diff:+.1f}%</td></tr>'
 
     zones = df['Zone'].dropna().unique()
     for zone in sorted(zones):
@@ -584,8 +584,8 @@ def generate_hierarchy_table_2(df):
         z_m_diff = z_m_mtd - z_m_lm
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
-        html += f'<td>{z_i_lm:.1f}%</td><td>{z_i_mtd:.1f}%</td><td style="color: {"#fca5a5" if z_i_diff < 0 else "#6ee7b7"};">{z_i_diff:+.1f}%</td>'
-        html += f'<td>{z_m_lm:.1f}%</td><td>{z_m_mtd:.1f}%</td><td style="color: {"#fca5a5" if z_m_diff < 0 else "#6ee7b7"};">{z_m_diff:+.1f}%</td></tr>'
+        html += f'<td>{z_i_lm:.1f}%</td><td>{z_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if z_i_diff < 0 else "#03543f"};">{z_i_diff:+.1f}%</td>'
+        html += f'<td>{z_m_lm:.1f}%</td><td>{z_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if z_m_diff < 0 else "#03543f"};">{z_m_diff:+.1f}%</td></tr>'
 
         asms = z_df['ASM'].dropna().unique()
         for asm in sorted(asms):
@@ -600,8 +600,8 @@ def generate_hierarchy_table_2(df):
             a_m_diff = a_m_mtd - a_m_lm
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
-            html += f'<td>{a_i_lm:.1f}%</td><td>{a_i_mtd:.1f}%</td><td style="color: {"#fca5a5" if a_i_diff < 0 else "#6ee7b7"};">{a_i_diff:+.1f}%</td>'
-            html += f'<td>{a_m_lm:.1f}%</td><td>{a_m_mtd:.1f}%</td><td style="color: {"#fca5a5" if a_m_diff < 0 else "#6ee7b7"};">{a_m_diff:+.1f}%</td></tr>'
+            html += f'<td>{a_i_lm:.1f}%</td><td>{a_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if a_i_diff < 0 else "#03543f"};">{a_i_diff:+.1f}%</td>'
+            html += f'<td>{a_m_lm:.1f}%</td><td>{a_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if a_m_diff < 0 else "#03543f"};">{a_m_diff:+.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -616,8 +616,8 @@ def generate_hierarchy_table_2(df):
                 t_m_diff = t_m_mtd - t_m_lm
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{t_i_lm:.1f}%</td><td>{t_i_mtd:.1f}%</td><td style="color: {"#fca5a5" if t_i_diff < 0 else "#6ee7b7"};">{t_i_diff:+.1f}%</td>'
-                html += f'<td>{t_m_lm:.1f}%</td><td>{t_m_mtd:.1f}%</td><td style="color: {"#fca5a5" if t_m_diff < 0 else "#6ee7b7"};">{t_m_diff:+.1f}%</td></tr>'
+                html += f'<td>{t_i_lm:.1f}%</td><td>{t_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if t_i_diff < 0 else "#03543f"};">{t_i_diff:+.1f}%</td>'
+                html += f'<td>{t_m_lm:.1f}%</td><td>{t_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if t_m_diff < 0 else "#03543f"};">{t_m_diff:+.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
     return html
@@ -642,7 +642,7 @@ def generate_hierarchy_table_3(df):
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     for b in brands_to_show:
         lm_c, mtd_c, diff_c = get_outlet_counts(df, b)
-        html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#fca5a5" if diff_c < 0 else "#6ee7b7"};">{diff_c:+_d}</td>'
+        html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
     html += '</tr>'
 
     zones = df['Zone'].dropna().unique()
@@ -651,7 +651,7 @@ def generate_hierarchy_table_3(df):
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         for b in brands_to_show:
             lm_c, mtd_c, diff_c = get_outlet_counts(z_df, b)
-            html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#fca5a5" if diff_c < 0 else "#6ee7b7"};">{diff_c:+_d}</td>'
+            html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
         html += '</tr>'
 
         asms = z_df['ASM'].dropna().unique()
@@ -661,7 +661,7 @@ def generate_hierarchy_table_3(df):
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             for b in brands_to_show:
                 lm_c, mtd_c, diff_c = get_outlet_counts(a_df, b)
-                html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#fca5a5" if diff_c < 0 else "#6ee7b7"};">{diff_c:+_d}</td>'
+                html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
             html += '</tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
@@ -671,7 +671,7 @@ def generate_hierarchy_table_3(df):
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
                 for b in brands_to_show:
                     lm_c, mtd_c, diff_c = get_outlet_counts(t_df, b)
-                    html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#fca5a5" if diff_c < 0 else "#6ee7b7"};">{diff_c:+_d}</td>'
+                    html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
                 html += '</tr>'
 
     html += '</tbody></table></div>'
