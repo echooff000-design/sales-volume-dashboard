@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import requests
 import io
+import datetime
+import pytz
+from streamlit_gsheets import GSheetsConnection
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
@@ -118,6 +121,26 @@ if not st.session_state["authenticated"]:
                 if not user_match.empty:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    
+                    try:
+                        conn = st.connection("gsheets", type=GSheetsConnection)
+                        LOG_SHEET_URL = "https://docs.google.com/spreadsheets/d/1j7jmyjjz2_bWJ-s7rZmtj52WS7XzrrVfNU4wnZ9mg9E/edit?usp=sharing"
+                        ist_timezone = pytz.timezone('Asia/Kolkata')
+                        current_time = datetime.datetime.now(ist_timezone).strftime("%Y-%m-%d %I:%M:%S %p")
+                        
+                        new_log = pd.DataFrame([{
+                            "Name": st.session_state["user_name"],
+                            "User ID": input_user,
+                            "Login Time (IST)": current_time
+                        }])
+                        
+                        existing_data = conn.read(spreadsheet=LOG_SHEET_URL, usecols=[0, 1, 2])
+                        updated_data = pd.concat([existing_data, new_log], ignore_index=True)
+                        conn.update(spreadsheet=LOG_SHEET_URL, data=updated_data)
+                        
+                    except Exception as e:
+                        print(f"Log error: {e}")
+                    
                     st.rerun()
                 else:
                     st.error("❌ Invalid User ID or Password")
@@ -169,7 +192,7 @@ if st.sidebar.button("🔄 Refresh Data Now"):
     st.sidebar.success("Cache cleared! Fetching newest data...")
 
 # --- 4. FETCH DATA INDIVIDUALLY FROM SHEETS ---
-required_sheets = ["This Month", "Last Month", "Target Data"]
+required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
 for sheet in required_sheets:
     if sheet not in dfs:
         st.error(f"❌ Could not find the sheet named '{sheet}' in your Excel file.")
@@ -178,7 +201,32 @@ for sheet in required_sheets:
 df_this = dfs["This Month"].copy()
 df_last = dfs["Last Month"].copy()
 df_target = dfs["Target Data"].copy()
+df_outlet = dfs["Outlet Master"].copy()
 
+# --- EXTRACT 'GROUP' FROM OUTLET MASTER ---
+df_outlet.columns = df_outlet.columns.astype(str).str.strip()
+if "Outlet Nan" in df_outlet.columns:
+    df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
+
+# Grab exactly Column H (Index 7) to act as the "Group" attribute
+if len(df_outlet.columns) > 7:
+    group_col_name = df_outlet.columns[7]
+    df_outlet.rename(columns={group_col_name: "Group"}, inplace=True)
+else:
+    if "Group" not in df_outlet.columns:
+        df_outlet["Group"] = "Unassigned"
+
+# Create mapping dictionary based on LIC No or Outlet Name
+mapping = {}
+map_key = None
+if "LIC No" in df_outlet.columns:
+    mapping = dict(zip(df_outlet["LIC No"].astype(str).str.strip(), df_outlet["Group"].astype(str).str.strip()))
+    map_key = "LIC No"
+elif "Outlet Name" in df_outlet.columns:
+    mapping = dict(zip(df_outlet["Outlet Name"].astype(str).str.strip(), df_outlet["Group"].astype(str).str.strip()))
+    map_key = "Outlet Name"
+
+# Format data and inject 'Group' mapping
 for d in [df_this, df_last, df_target]:
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
@@ -188,6 +236,12 @@ for d in [df_this, df_last, df_target]:
     
     if "Brand" in d.columns:
         d["Brand"] = d["Brand"].replace({"IBW": "IBDC"})
+        
+    # Map the Group into the dataset
+    if map_key and map_key in d.columns:
+        d["Group"] = d[map_key].astype(str).str.strip().map(mapping).fillna("Unassigned")
+    else:
+        d["Group"] = "Unassigned"
 
 df_this["Metric"] = "This Month"
 df_last["Metric"] = "Last Month"
@@ -250,29 +304,36 @@ master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_val
 
 # --- 6. CASCADING SIDEBAR FILTERS ---
 st.subheader("🔍 Filters")
-col1, col2, col3, col4 = st.columns(4)
+# Changed to 5 columns to accommodate the new Group filter!
+col1, col2, col3, col4, col5 = st.columns(5)
 
 temp_df = df_raw.copy()
 
 with col1:
+    group_options = ["All"] + sorted(temp_df["Group"].dropna().astype(str).unique().tolist()) if "Group" in temp_df.columns else ["All"]
+    selected_group = st.selectbox("Group Filter", group_options)
+    if selected_group != "All":
+        temp_df = temp_df[temp_df["Group"].astype(str) == selected_group]
+
+with col2:
     asm_options = ["All"] + sorted(temp_df["ASM"].dropna().astype(str).unique().tolist()) if "ASM" in temp_df.columns else ["All"]
     selected_asm = st.selectbox("ASM Filter", asm_options)
     if selected_asm != "All":
         temp_df = temp_df[temp_df["ASM"].astype(str) == selected_asm]
 
-with col2:
+with col3:
     tse_options = ["All"] + sorted(temp_df["TSE"].dropna().astype(str).unique().tolist()) if "TSE" in temp_df.columns else ["All"]
     selected_tse = st.selectbox("TSE Filter", tse_options)
     if selected_tse != "All":
         temp_df = temp_df[temp_df["TSE"].astype(str) == selected_tse]
 
-with col3:
+with col4:
     lic_options = ["All"] + sorted(temp_df["LIC No"].dropna().astype(str).unique().tolist()) if "LIC No" in temp_df.columns else ["All"]
     selected_lic = st.selectbox("LIC No Filter", lic_options)
     if selected_lic != "All":
         temp_df = temp_df[temp_df["LIC No"].astype(str) == selected_lic]
 
-with col4:
+with col5:
     outlet_options = ["All"] + sorted(temp_df["Outlet Name"].dropna().astype(str).unique().tolist()) if "Outlet Name" in temp_df.columns else ["All"]
     selected_outlet = st.selectbox("Outlet Filter", outlet_options)
     if selected_outlet != "All":
