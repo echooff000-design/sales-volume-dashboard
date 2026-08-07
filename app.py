@@ -143,12 +143,12 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
-    /* --- CUSTOM TAB TEXT & ACTIVE COLORS --- */
-    .stTabs [data-baseweb="tab"] p {
+    /* --- CUSTOM TAB TEXT & ACTIVE COLORS (FORCED VISIBILITY) --- */
+    button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
         color: #475569 !important; /* Inactive tab text color (Dark Slate) */
         font-weight: 600 !important;
     }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] p {
+    button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
         color: #2563eb !important; /* Active tab text color (Vibrant Blue) */
         font-weight: 700 !important;
     }
@@ -181,12 +181,12 @@ with col_logout:
         st.session_state["user_name"] = ""
         st.rerun()
 
-st.sidebar.header("📁 Data Source")
+st.sidebar.markdown("<h2 style='color: #0f172a; font-size: 20px; font-weight: 600;'>📁 Data Source</h2>", unsafe_allow_html=True)
 if last_update:
-    st.sidebar.caption(f"🕒 **Last Synced:** {last_update}")
+    st.sidebar.markdown(f"<p style='color: #475569; font-size: 13px;'>🕒 <b>Last Synced:</b> {last_update}</p>", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("📋 **Admin Panel**")
+st.sidebar.markdown("<p style='color: #0f172a; font-size: 15px; font-weight: 600;'>📋 Admin Panel</p>", unsafe_allow_html=True)
 if os.path.exists("login_logs.csv"):
     with open("login_logs.csv", "rb") as file:
         st.sidebar.download_button(label="📥 Download Login Logs", data=file, file_name="login_logs.csv", mime="text/csv")
@@ -324,7 +324,7 @@ df_raw[brand_col] = pd.Categorical(df_raw[brand_col], categories=final_brand_ord
 master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_values(by=[seg_col, brand_col])
 
 # --- 6. CASCADING SIDEBAR FILTERS ---
-st.subheader("🔍 Filters")
+st.markdown("<h3 style='color: #0f172a; font-size: 20px;'>🔍 Filters</h3>", unsafe_allow_html=True)
 col1, col2, col3, col4, col5 = st.columns(5)
 
 temp_df = df_raw.copy()
@@ -615,16 +615,16 @@ with tab2:
     st.write(html_ms, unsafe_allow_html=True)
 
 with tab3:
-    st.markdown("### Zone, ASM & TSE Performance Breakdown (IBDC & MHW)")
+    st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
     html_h1 = generate_hierarchy_table_1(filtered_df)
     st.write(html_h1, unsafe_allow_html=True)
 
 with tab4:
-    st.markdown("### Share / Growth Hierarchy Matrix (FY, LM, MTD)")
+    st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Share / Growth Hierarchy Matrix (FY, LM, MTD)</h3>", unsafe_allow_html=True)
     html_h2 = generate_hierarchy_table_2(filtered_df)
     st.write(html_h2, unsafe_allow_html=True)
 
 with tab5:
-    st.markdown("### Unique Billing Outlet Count Comparison (LM vs MTD)")
+    st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
     html_h3 = generate_hierarchy_table_3(filtered_df)
     st.write(html_h3, unsafe_allow_html=True)
