@@ -140,20 +140,27 @@ if not st.session_state["authenticated"]:
 # --- MAIN DASHBOARD STYLING ---
 st.markdown("""
     <style>
-    .stApp { background-color: #ffffff; }
+    /* --- LIGHT SKY BLUE BACKGROUND --- */
+    .stApp { background-color: #e0f2fe !important; }
+
+    /* --- SIDEBAR TEXT FORCED TO WHITE --- */
+    [data-testid="stSidebar"] * {
+        color: #ffffff !important;
+    }
+
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
-    /* --- FORCED VISIBLE TAB TEXT COLORS --- */
+    /* --- TAB TEXT COLORS --- */
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
     .stTabs [data-baseweb="tab"] p {
-        color: #1e293b !important; /* Dark text for all tab labels */
+        color: #1e293b !important;
         font-weight: 600 !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
     .stTabs [data-baseweb="tab"][aria-selected="true"] span,
     .stTabs [data-baseweb="tab"][aria-selected="true"] p {
-        color: #2563eb !important; /* Vibrant Blue for the active tab */
+        color: #2563eb !important;
         font-weight: 700 !important;
     }
 
@@ -179,18 +186,18 @@ with col_logo:
 with col_title:
     st.markdown("<h3 style='margin-top: 10px; font-size: 22px; color: #0f172a;'>WB Sale Data</h3>", unsafe_allow_html=True)
 with col_logout:
-    st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #334155;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #0f172a;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
     if st.button("Logout"):
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
         st.rerun()
 
-st.sidebar.markdown("<h2 style='color: #0f172a; font-size: 20px; font-weight: 600;'>📁 Data Source</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("📁 **Data Source**")
 if last_update:
-    st.sidebar.markdown(f"<p style='color: #475569; font-size: 13px;'>🕒 <b>Last Synced:</b> {last_update}</p>", unsafe_allow_html=True)
+    st.sidebar.caption(f"🕒 **Last Synced:** {last_update}")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("<p style='color: #0f172a; font-size: 15px; font-weight: 600;'>📋 Admin Panel</p>", unsafe_allow_html=True)
+st.sidebar.markdown("📋 **Admin Panel**")
 if os.path.exists("login_logs.csv"):
     with open("login_logs.csv", "rb") as file:
         st.sidebar.download_button(label="📥 Download Login Logs", data=file, file_name="login_logs.csv", mime="text/csv")
