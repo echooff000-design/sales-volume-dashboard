@@ -1,5 +1,7 @@
 streamlit
 pandas
 requests
-pyxlsb
 openpyxl
+pyxlsb
+pytz
+st-gsheets
