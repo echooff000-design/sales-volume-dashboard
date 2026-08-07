@@ -161,15 +161,16 @@ st.markdown("""
         background-color: #ef4444 !important;
     }
 
+    /* --- MOBILE-RESPONSIVE TABLE FIT --- */
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-    .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
-    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
-    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 10px; white-space: nowrap; }
-    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 10px; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 10px; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 4px 3px; text-align: center; word-break: break-word; }
+    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 9px; }
+    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 9px; }
     .brand-row { background-color: #FFFFFF; }
-    .brand-col-text { text-align: left !important; padding-left: 8px !important; font-size: 10px; }
-    .seg-col-text { text-align: left !important; line-height: 1.2; }
-    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 11px; border-top: 2px solid #8EA9DB; }
+    .brand-col-text { text-align: left !important; padding-left: 5px !important; font-size: 9px; }
+    .seg-col-text { text-align: left !important; line-height: 1.2; font-size: 9px; }
+    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 10px; border-top: 2px solid #8EA9DB; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -460,6 +461,16 @@ def calc_ms_mhw(sub_df):
     denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['This Month'].sum()
     return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
 
+def calc_ms_ibdc_lm(sub_df):
+    ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['Last Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['Last Month'].sum()
+    return (ibdc_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
+def calc_ms_mhw_lm(sub_df):
+    mhw_vol = sub_df[sub_df['Brand'] == 'MHW']['Last Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['Last Month'].sum()
+    return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
 def generate_hierarchy_table_1(df):
     """1. Target vs Ach: Recalculate MS% using custom formulas for IBDC and MHW"""
     brands_to_show = ["IBDC", "MHW"]
@@ -543,7 +554,7 @@ def generate_hierarchy_table_1(df):
     return html
 
 def generate_hierarchy_table_2(df):
-    """2. MS% Details: Remove FY column, calculate proper MS% (same formula), and add diff MTD-LM"""
+    """2. MS% Details: Remove FY, show LM, MTD, and Diff (MTD-LM)"""
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
@@ -615,16 +626,6 @@ def generate_hierarchy_table_2(df):
 
     html += '</tbody></table></div>'
     return html
-
-def calc_ms_ibdc_lm(sub_df):
-    ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['Last Month'].sum()
-    denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['Last Month'].sum()
-    return (ibdc_vol / denom_vol * 100) if denom_vol > 0 else 0.0
-
-def calc_ms_mhw_lm(sub_df):
-    mhw_vol = sub_df[sub_df['Brand'] == 'MHW']['Last Month'].sum()
-    denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['Last Month'].sum()
-    return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
 
 def generate_hierarchy_table_3(df):
     """3. WOD Details: Count unique mapped outlets that billed each brand (volume > 0) for LM and MTD, plus diff"""
