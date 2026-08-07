@@ -145,17 +145,16 @@ st.markdown("""
     [data-testid="stSidebar"] * { color: #ffffff !important; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
-    /* --- TAB TEXT COLORS: INACTIVE RED, ACTIVE RED WITH BOLD --- */
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
     .stTabs [data-baseweb="tab"] p {
-        color: #ef4444 !important; /* Inactive tab text (Red) */
+        color: #ef4444 !important;
         font-weight: 600 !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
     .stTabs [data-baseweb="tab"][aria-selected="true"] span,
     .stTabs [data-baseweb="tab"][aria-selected="true"] p {
-        color: #ef4444 !important; /* Active tab text (Red) */
+        color: #ef4444 !important;
         font-weight: 700 !important;
     }
     .stTabs [data-baseweb="tab-highlight"] {
@@ -449,8 +448,20 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# --- 8. HIERARCHY REPORT GENERATORS (FOR DASHBOARD SUB-VIEWS) ---
+# --- 8. UPDATED HIERARCHY REPORT GENERATORS (FOR DASHBOARD SUB-VIEWS) ---
+
+def calc_ms_ibdc(sub_df):
+    ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['This Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['This Month'].sum()
+    return (ibdc_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
+def calc_ms_mhw(sub_df):
+    mhw_vol = sub_df[sub_df['Brand'] == 'MHW']['This Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['This Month'].sum()
+    return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
 def generate_hierarchy_table_1(df):
+    """1. Target vs Ach: Recalculate MS% using custom formulas for IBDC and MHW"""
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
@@ -464,12 +475,12 @@ def generate_hierarchy_table_1(df):
     tot_lm_ibdc = df[df['Brand']=='IBDC']['Last Month'].sum()
     tot_tgt_ibdc = df[df['Brand']=='IBDC']['Target'].sum()
     tot_mtd_ibdc = df[df['Brand']=='IBDC']['This Month'].sum()
-    ms_ibdc = (tot_mtd_ibdc / tot_tgt_ibdc * 100) if tot_tgt_ibdc else 0
+    ms_ibdc = calc_ms_ibdc(df)
 
     tot_lm_mhw = df[df['Brand']=='MHW']['Last Month'].sum()
     tot_tgt_mhw = df[df['Brand']=='MHW']['Target'].sum()
     tot_mtd_mhw = df[df['Brand']=='MHW']['This Month'].sum()
-    ms_mhw = (tot_mtd_mhw / tot_tgt_mhw * 100) if tot_tgt_mhw else 0
+    ms_mhw = calc_ms_mhw(df)
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     html += f'<td>{int(tot_lm_ibdc):,}</td><td>{int(tot_tgt_ibdc):,}</td><td>{int(tot_mtd_ibdc):,}</td><td>{ms_ibdc:.1f}%</td>'
@@ -481,12 +492,12 @@ def generate_hierarchy_table_1(df):
         z_lm_i = z_df[z_df['Brand']=='IBDC']['Last Month'].sum()
         z_tgt_i = z_df[z_df['Brand']=='IBDC']['Target'].sum()
         z_mtd_i = z_df[z_df['Brand']=='IBDC']['This Month'].sum()
-        z_ms_i = (z_mtd_i / z_tgt_i * 100) if z_tgt_i else 0
+        z_ms_i = calc_ms_ibdc(z_df)
 
         z_lm_m = z_df[z_df['Brand']=='MHW']['Last Month'].sum()
         z_tgt_m = z_df[z_df['Brand']=='MHW']['Target'].sum()
         z_mtd_m = z_df[z_df['Brand']=='MHW']['This Month'].sum()
-        z_ms_m = (z_mtd_m / z_tgt_m * 100) if z_tgt_m else 0
+        z_ms_m = calc_ms_mhw(z_df)
 
         html += f'<tr class="subtotal-row" style="background-color: #D9E1F2;"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
@@ -499,12 +510,12 @@ def generate_hierarchy_table_1(df):
             a_lm_i = a_df[a_df['Brand']=='IBDC']['Last Month'].sum()
             a_tgt_i = a_df[a_df['Brand']=='IBDC']['Target'].sum()
             a_mtd_i = a_df[a_df['Brand']=='IBDC']['This Month'].sum()
-            a_ms_i = (a_mtd_i / a_tgt_i * 100) if a_tgt_i else 0
+            a_ms_i = calc_ms_ibdc(a_df)
 
             a_lm_m = a_df[a_df['Brand']=='MHW']['Last Month'].sum()
             a_tgt_m = a_df[a_df['Brand']=='MHW']['Target'].sum()
             a_mtd_m = a_df[a_df['Brand']=='MHW']['This Month'].sum()
-            a_ms_m = (a_mtd_m / a_tgt_m * 100) if a_tgt_m else 0
+            a_ms_m = calc_ms_mhw(a_df)
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
@@ -517,12 +528,12 @@ def generate_hierarchy_table_1(df):
                 t_lm_i = t_df[t_df['Brand']=='IBDC']['Last Month'].sum()
                 t_tgt_i = t_df[t_df['Brand']=='IBDC']['Target'].sum()
                 t_mtd_i = t_df[t_df['Brand']=='IBDC']['This Month'].sum()
-                t_ms_i = (t_mtd_i / t_tgt_i * 100) if t_tgt_i else 0
+                t_ms_i = calc_ms_ibdc(t_df)
 
                 t_lm_m = t_df[t_df['Brand']=='MHW']['Last Month'].sum()
                 t_tgt_m = t_df[t_df['Brand']=='MHW']['Target'].sum()
                 t_mtd_m = t_df[t_df['Brand']=='MHW']['This Month'].sum()
-                t_ms_m = (t_mtd_m / t_tgt_m * 100) if t_tgt_m else 0
+                t_ms_m = calc_ms_mhw(t_df)
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
                 html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
@@ -532,6 +543,7 @@ def generate_hierarchy_table_1(df):
     return html
 
 def generate_hierarchy_table_2(df):
+    """2. MS% Details: Remove FY column, calculate proper MS% (same formula), and add diff MTD-LM"""
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
@@ -539,35 +551,83 @@ def generate_hierarchy_table_2(df):
         html += f'<th colspan="3">{b}</th>'
     html += '</tr><tr>'
     for _ in brands_to_show:
-        html += '<th>FY</th><th>LM</th><th>MTD</th>'
+        html += '<th>LM</th><th>MTD</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
+    wb_ibdc_lm = calc_ms_ibdc_lm(df)
+    wb_ibdc_mtd = calc_ms_ibdc(df)
+    wb_ibdc_diff = wb_ibdc_mtd - wb_ibdc_lm
+
+    wb_mhw_lm = calc_ms_mhw_lm(df)
+    wb_mhw_mtd = calc_ms_mhw(df)
+    wb_mhw_diff = wb_mhw_mtd - wb_mhw_lm
+
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
-    html += '<td>15.3%</td><td>8.1%</td><td>7.2%</td><td>1.0%</td><td>1.1%</td><td>0.9%</td></tr>'
+    html += f'<td>{wb_ibdc_lm:.1f}%</td><td>{wb_ibdc_mtd:.1f}%</td><td style="color: {"#9b1c1c" if wb_ibdc_diff < 0 else "#03543f"};">{wb_ibdc_diff:+.1f}%</td>'
+    html += f'<td>{wb_mhw_lm:.1f}%</td><td>{wb_mhw_mtd:.1f}%</td><td style="color: {"#9b1c1c" if wb_mhw_diff < 0 else "#03543f"};">{wb_mhw_diff:+.1f}%</td></tr>'
 
     zones = df['Zone'].dropna().unique()
     for zone in sorted(zones):
         z_df = df[df['Zone'] == zone]
+        z_i_lm = calc_ms_ibdc_lm(z_df)
+        z_i_mtd = calc_ms_ibdc(z_df)
+        z_i_diff = z_i_mtd - z_i_lm
+
+        z_m_lm = calc_ms_mhw_lm(z_df)
+        z_m_mtd = calc_ms_mhw(z_df)
+        z_m_diff = z_m_mtd - z_m_lm
+
         html += f'<tr class="subtotal-row" style="background-color: #D9E1F2;"><td class="seg-col-text"><b>{zone}</b></td>'
-        html += '<td>12.3%</td><td>6.9%</td><td>6.8%</td><td>0.9%</td><td>1.1%</td><td>1.0%</td></tr>'
+        html += f'<td>{z_i_lm:.1f}%</td><td>{z_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if z_i_diff < 0 else "#03543f"};">{z_i_diff:+.1f}%</td>'
+        html += f'<td>{z_m_lm:.1f}%</td><td>{z_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if z_m_diff < 0 else "#03543f"};">{z_m_diff:+.1f}%</td></tr>'
 
         asms = z_df['ASM'].dropna().unique()
         for asm in sorted(asms):
             if str(asm).lower() in ["nan", "none", ""]: continue
             a_df = z_df[z_df['ASM'] == asm]
+            a_i_lm = calc_ms_ibdc_lm(a_df)
+            a_i_mtd = calc_ms_ibdc(a_df)
+            a_i_diff = a_i_mtd - a_i_lm
+
+            a_m_lm = calc_ms_mhw_lm(a_df)
+            a_m_mtd = calc_ms_mhw(a_df)
+            a_m_diff = a_m_mtd - a_m_lm
+
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
-            html += '<td>12.5%</td><td>6.9%</td><td>6.4%</td><td>1.0%</td><td>1.4%</td><td>0.9%</td></tr>'
+            html += f'<td>{a_i_lm:.1f}%</td><td>{a_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if a_i_diff < 0 else "#03543f"};">{a_i_diff:+.1f}%</td>'
+            html += f'<td>{a_m_lm:.1f}%</td><td>{a_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if a_m_diff < 0 else "#03543f"};">{a_m_diff:+.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
                 if str(tse).lower() in ["nan", "none", ""]: continue
+                t_df = a_df[a_df['TSE'] == tse]
+                t_i_lm = calc_ms_ibdc_lm(t_df)
+                t_i_mtd = calc_ms_ibdc(t_df)
+                t_i_diff = t_i_mtd - t_i_lm
+
+                t_m_lm = calc_ms_mhw_lm(t_df)
+                t_m_mtd = calc_ms_mhw(t_df)
+                t_m_diff = t_m_mtd - t_m_lm
+
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += '<td>22.6%</td><td>11.5%</td><td>12.3%</td><td>0.6%</td><td>0.4%</td><td>1.0%</td></tr>'
+                html += f'<td>{t_i_lm:.1f}%</td><td>{t_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if t_i_diff < 0 else "#03543f"};">{t_i_diff:+.1f}%</td>'
+                html += f'<td>{t_m_lm:.1f}%</td><td>{t_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if t_m_diff < 0 else "#03543f"};">{t_m_diff:+.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
     return html
 
+def calc_ms_ibdc_lm(sub_df):
+    ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['Last Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['Last Month'].sum()
+    return (ibdc_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
+def calc_ms_mhw_lm(sub_df):
+    mhw_vol = sub_df[sub_df['Brand'] == 'MHW']['Last Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['Last Month'].sum()
+    return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
 def generate_hierarchy_table_3(df):
+    """3. WOD Details: Count unique mapped outlets that billed each brand (volume > 0) for LM and MTD, plus diff"""
     brands_to_show = ["IBDC", "MCD Lux", "IQ", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">Unique Billing Outlet<br>ZONE/ASM/TSE</th>'
@@ -578,17 +638,26 @@ def generate_hierarchy_table_3(df):
         html += '<th>LM</th><th>MTD</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
+    def get_outlet_counts(sub_df, brand_name):
+        lm_outlets = sub_df[(sub_df['Brand'] == brand_name) & (sub_df['Last Month'] > 0)]['LIC No'].nunique() if 'LIC No' in sub_df.columns else 0
+        mtd_outlets = sub_df[(sub_df['Brand'] == brand_name) & (sub_df['This Month'] > 0)]['LIC No'].nunique() if 'LIC No' in sub_df.columns else 0
+        diff = mtd_outlets - lm_outlets
+        return lm_outlets, mtd_outlets, diff
+
+    # WB Total
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
-    for _ in brands_to_show:
-        html += '<td>3,303</td><td>1,268</td><td style="color: #9b1c1c;">-2,034</td>'
+    for b in brands_to_show:
+        lm_c, mtd_c, diff_c = get_outlet_counts(df, b)
+        html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
     html += '</tr>'
 
     zones = df['Zone'].dropna().unique()
     for zone in sorted(zones):
         z_df = df[df['Zone'] == zone]
         html += f'<tr class="subtotal-row" style="background-color: #D9E1F2;"><td class="seg-col-text"><b>{zone}</b></td>'
-        for _ in brands_to_show:
-            html += '<td>1,329</td><td>604</td><td style="color: #9b1c1c;">-725</td>'
+        for b in brands_to_show:
+            lm_c, mtd_c, diff_c = get_outlet_counts(z_df, b)
+            html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
         html += '</tr>'
 
         asms = z_df['ASM'].dropna().unique()
@@ -596,16 +665,19 @@ def generate_hierarchy_table_3(df):
             if str(asm).lower() in ["nan", "none", ""]: continue
             a_df = z_df[z_df['ASM'] == asm]
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
-            for _ in brands_to_show:
-                html += '<td>613</td><td>292</td><td style="color: #9b1c1c;">-321</td>'
+            for b in brands_to_show:
+                lm_c, mtd_c, diff_c = get_outlet_counts(a_df, b)
+                html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
             html += '</tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
                 if str(tse).lower() in ["nan", "none", ""]: continue
+                t_df = a_df[a_df['TSE'] == tse]
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                for _ in brands_to_show:
-                    html += '<td>109</td><td>59</td><td style="color: #9b1c1c;">-50</td>'
+                for b in brands_to_show:
+                    lm_c, mtd_c, diff_c = get_outlet_counts(t_df, b)
+                    html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
                 html += '</tr>'
 
     html += '</tbody></table></div>'
@@ -634,7 +706,7 @@ with main_tab3:
         st.write(html_h1, unsafe_allow_html=True)
 
     with sub_tab2:
-        st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Share / Growth Hierarchy Matrix (FY, LM, MTD)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
         st.write(html_h2, unsafe_allow_html=True)
 
