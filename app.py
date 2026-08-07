@@ -85,7 +85,6 @@ if not st.session_state["authenticated"]:
         <style>
         .stApp { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
         [data-testid="stForm"] { background: rgba(255, 255, 255, 0.03) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
-        /* Reduce login logo size by 50% */
         [data-testid="stForm"] img { max-width: 120px !important; display: block; margin: 0 auto; }
         .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
         .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; transition: all 0.3s ease; }
@@ -142,17 +141,10 @@ if not st.session_state["authenticated"]:
 # --- MAIN DASHBOARD STYLING ---
 st.markdown("""
     <style>
-    /* --- LIGHT SKY BLUE BACKGROUND --- */
     .stApp { background-color: #e0f2fe !important; }
-
-    /* --- SIDEBAR TEXT FORCED TO WHITE --- */
-    [data-testid="stSidebar"] * {
-        color: #ffffff !important;
-    }
-
+    [data-testid="stSidebar"] * { color: #ffffff !important; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
-    /* --- TAB TEXT COLORS: INACTIVE BLACK, ACTIVE RED --- */
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
     .stTabs [data-baseweb="tab"] p {
@@ -201,6 +193,20 @@ st.sidebar.markdown("📁 **Data Source**")
 if last_update:
     st.sidebar.caption(f"🕒 **Last Synced:** {last_update}")
 
+if st.sidebar.button("🔄 Refresh Data Now"):
+    st.cache_data.clear()
+    st.sidebar.success("Cache cleared! Fetching newest data...")
+
+st.sidebar.markdown("---")
+
+# --- SIDEBAR RADIO SUB-NAVIGATION FOR DASHBOARD ---
+st.sidebar.markdown("📊 **Dashboard Views**")
+dashboard_sub_view = st.sidebar.radio(
+    "Select Dashboard View",
+    ["Target vs Ach", "MS% Details", "WOD Details"],
+    label_visibility="collapsed"
+)
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
 if os.path.exists("login_logs.csv"):
@@ -211,11 +217,6 @@ else:
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
-st.sidebar.markdown("---")
-
-if st.sidebar.button("🔄 Refresh Data Now"):
-    st.cache_data.clear()
-    st.sidebar.success("Cache cleared! Fetching newest data...")
 
 # --- 4. FETCH DATA FROM SHEETS ---
 required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
@@ -229,7 +230,7 @@ df_last = dfs["Last Month"].copy()
 df_target = dfs["Target Data"].copy()
 df_outlet = dfs["Outlet Master"].copy()
 
-# --- PROCESS OUTLET MASTER FOR MAPPINGS (Zone, ASM, TSE, Group) ---
+# --- PROCESS OUTLET MASTER FOR MAPPINGS (Zone, ASM, TSE REV, Group) ---
 df_outlet.columns = df_outlet.columns.astype(str).str.strip()
 if "Outlet Nan" in df_outlet.columns:
     df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
@@ -243,7 +244,9 @@ else:
 
 zone_col_map = next((col for col in df_outlet.columns if "zone" in col.lower()), None)
 asm_col_map = next((col for col in df_outlet.columns if col.lower() in ["asm", "manager"]), None)
-tse_col_map = next((col for col in df_outlet.columns if col.lower() in ["tse", "rep", "executive"]), None)
+
+# TSE REV Mapping from Column "O" (Index 14) if it exists, otherwise fallback
+tse_col_map = df_outlet.columns[14] if len(df_outlet.columns) > 14 else next((col for col in df_outlet.columns if "tse" in col.lower()), None)
 
 map_key = "LIC No" if "LIC No" in df_outlet.columns else ("Outlet Name" if "Outlet Name" in df_outlet.columns else None)
 
@@ -275,8 +278,8 @@ for d in [df_this, df_last, df_target]:
             d["Zone"] = "West Bengal"
         if asm_mapping:
             d["ASM"] = d[k_col].astype(str).str.strip().map(asm_mapping).fillna(d.get("ASM", "Unassigned"))
-        if tse_mapping and "TSE" in d.columns:
-            d["TSE"] = d[k_col].astype(str).str.strip().map(tse_mapping).fillna(d["TSE"])
+        if tse_mapping:
+            d["TSE"] = d[k_col].astype(str).str.strip().map(tse_mapping).fillna(d.get("TSE", "Unassigned"))
     else:
         d["Group"] = "Unassigned"
         d["Zone"] = "West Bengal"
@@ -455,7 +458,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# --- 8. HIERARCHY REPORT GENERATORS (FOR NEW TABS) ---
+# --- 8. HIERARCHY REPORT GENERATORS (FOR DASHBOARD SUB-VIEWS) ---
 def generate_hierarchy_table_1(df):
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
@@ -617,30 +620,34 @@ def generate_hierarchy_table_3(df):
     html += '</tbody></table></div>'
     return html
 
-# --- 9. DISPLAY DASHBOARD IN TABS ---
+# --- 9. DISPLAY MAIN TABS (Volume, Ms%, Dashboard) ---
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Hierarchy View 1", "📊 Hierarchy View 2", "📊 Unique Outlets"])
+main_tab1, main_tab2, main_tab3 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Dashboard"])
 
-with tab1:
+with main_tab1:
     html_vol = generate_html_table(filtered_df, metric_type="Volume")
     st.write(html_vol, unsafe_allow_html=True)
 
-with tab2:
+with main_tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
     st.write(html_ms, unsafe_allow_html=True)
 
-with tab3:
-    st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
-    html_h1 = generate_hierarchy_table_1(filtered_df)
-    st.write(html_h1, unsafe_allow_html=True)
+with main_tab3:
+    # Sub-navigation for Dashboard
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
+    
+    with sub_tab1:
+        st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
+        html_h1 = generate_hierarchy_table_1(filtered_df)
+        st.write(html_h1, unsafe_allow_html=True)
 
-with tab4:
-    st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Share / Growth Hierarchy Matrix (FY, LM, MTD)</h3>", unsafe_allow_html=True)
-    html_h2 = generate_hierarchy_table_2(filtered_df)
-    st.write(html_h2, unsafe_allow_html=True)
+    with sub_tab2:
+        st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Share / Growth Hierarchy Matrix (FY, LM, MTD)</h3>", unsafe_allow_html=True)
+        html_h2 = generate_hierarchy_table_2(filtered_df)
+        st.write(html_h2, unsafe_allow_html=True)
 
-with tab5:
-    st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
-    html_h3 = generate_hierarchy_table_3(filtered_df)
-    st.write(html_h3, unsafe_allow_html=True)
+    with sub_tab3:
+        st.markdown("<h3 style='color: #0f172a; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
+        html_h3 = generate_hierarchy_table_3(filtered_df)
+        st.write(html_h3, unsafe_allow_html=True)
