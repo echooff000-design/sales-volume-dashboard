@@ -145,16 +145,17 @@ st.markdown("""
     [data-testid="stSidebar"] * { color: #ffffff !important; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
     
+    /* --- TAB TEXT COLORS: INACTIVE RED, ACTIVE RED WITH BOLD --- */
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
     .stTabs [data-baseweb="tab"] p {
-        color: #000000 !important;
+        color: #ef4444 !important; /* Inactive tab text (Red) */
         font-weight: 600 !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
     .stTabs [data-baseweb="tab"][aria-selected="true"] span,
     .stTabs [data-baseweb="tab"][aria-selected="true"] p {
-        color: #ef4444 !important;
+        color: #ef4444 !important; /* Active tab text (Red) */
         font-weight: 700 !important;
     }
     .stTabs [data-baseweb="tab-highlight"] {
