@@ -142,6 +142,17 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #1e293b !important; font-weight: 600 !important; }
+    
+    /* --- CUSTOM TAB TEXT & ACTIVE COLORS --- */
+    .stTabs [data-baseweb="tab"] p {
+        color: #475569 !important; /* Inactive tab text color (Dark Slate) */
+        font-weight: 600 !important;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p {
+        color: #2563eb !important; /* Active tab text color (Vibrant Blue) */
+        font-weight: 700 !important;
+    }
+
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
     .custom-dashboard-table { width: 100%; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 11px; }
     .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 5px 6px; text-align: center; }
@@ -207,7 +218,6 @@ df_outlet.columns = df_outlet.columns.astype(str).str.strip()
 if "Outlet Nan" in df_outlet.columns:
     df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
 
-# Map Group (Column H / index 7)
 if len(df_outlet.columns) > 7:
     group_col_name = df_outlet.columns[7]
     df_outlet.rename(columns={group_col_name: "Group"}, inplace=True)
@@ -215,12 +225,10 @@ else:
     if "Group" not in df_outlet.columns:
         df_outlet["Group"] = "Unassigned"
 
-# Dynamically find Zone, ASM, TSE columns inside Outlet Master if present
 zone_col_map = next((col for col in df_outlet.columns if "zone" in col.lower()), None)
 asm_col_map = next((col for col in df_outlet.columns if col.lower() in ["asm", "manager"]), None)
 tse_col_map = next((col for col in df_outlet.columns if col.lower() in ["tse", "rep", "executive"]), None)
 
-# Setup lookup keys for merging/mapping
 map_key = "LIC No" if "LIC No" in df_outlet.columns else ("Outlet Name" if "Outlet Name" in df_outlet.columns else None)
 
 group_mapping, zone_mapping, asm_mapping, tse_mapping = {}, {}, {}, {}
@@ -414,7 +422,7 @@ def generate_html_table(df, metric_type="Volume"):
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
-                b_this_pct = (row["This Month"] / seg_this) * 100 if seg_last else 0 # fallback safety
+                b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
                 growth_highlight = ''
                 if b_growth > 0:
@@ -433,7 +441,6 @@ def generate_html_table(df, metric_type="Volume"):
 
 # --- 8. HIERARCHY REPORT GENERATORS (FOR NEW TABS) ---
 def generate_hierarchy_table_1(df):
-    """Generates Hierarchy Report Option 1: Zone -> ASM -> TSE with IBDC & MHW metrics (LM, Target, MTD, MS%)"""
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
@@ -444,7 +451,6 @@ def generate_hierarchy_table_1(df):
         html += '<th>LM</th><th>Target</th><th>MTD</th><th>MS%</th>'
     html += '</tr></thead><tbody>'
 
-    # Compute State Totals
     tot_lm_ibdc = df[df['Brand']=='IBDC']['Last Month'].sum()
     tot_tgt_ibdc = df[df['Brand']=='IBDC']['Target'].sum()
     tot_mtd_ibdc = df[df['Brand']=='IBDC']['This Month'].sum()
@@ -459,7 +465,6 @@ def generate_hierarchy_table_1(df):
     html += f'<td>{int(tot_lm_ibdc):,}</td><td>{int(tot_tgt_ibdc):,}</td><td>{int(tot_mtd_ibdc):,}</td><td>{ms_ibdc:.1f}%</td>'
     html += f'<td>{int(tot_lm_mhw):,}</td><td>{int(tot_tgt_mhw):,}</td><td>{int(tot_mtd_mhw):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
-    # Group by Zone -> ASM -> TSE
     zones = df['Zone'].dropna().unique()
     for zone in sorted(zones):
         z_df = df[df['Zone'] == zone]
@@ -511,13 +516,12 @@ def generate_hierarchy_table_1(df):
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
                 html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
-                html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+                html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{t_ms_m:.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
     return html
 
 def generate_hierarchy_table_2(df):
-    """Generates Hierarchy Report Option 2: Percentage share / Growth breakdown view across FY, LM, MTD"""
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
@@ -528,7 +532,6 @@ def generate_hierarchy_table_2(df):
         html += '<th>FY</th><th>LM</th><th>MTD</th>'
     html += '</tr></thead><tbody>'
 
-    # State total placeholder percentages
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     html += '<td>15.3%</td><td>8.1%</td><td>7.2%</td><td>1.0%</td><td>1.1%</td><td>0.9%</td></tr>'
 
@@ -555,7 +558,6 @@ def generate_hierarchy_table_2(df):
     return html
 
 def generate_hierarchy_table_3(df):
-    """Generates Hierarchy Report Option 3: Unique Billing Outlet counts (LM, MTD, Diff) across brands"""
     brands_to_show = ["IBDC", "MCD Lux", "IQ", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">Unique Billing Outlet<br>ZONE/ASM/TSE</th>'
@@ -566,7 +568,6 @@ def generate_hierarchy_table_3(df):
         html += '<th>LM</th><th>MTD</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
-    # State total row
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     for _ in brands_to_show:
         html += '<td>3,303</td><td>1,268</td><td style="color: #9b1c1c;">-2,034</td>'
