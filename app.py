@@ -10,7 +10,7 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & ADD DEEP BLUE BRAND-BLOCK CSS ---
+# --- HIDE STREAMLIT BRANDING & ADD DEEP BLUE INDIVIDUAL BRAND BLOCK CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -41,7 +41,7 @@ hide_streamlit_style = """
                 color: #ffffff !important;
             }
             
-            /* --- DEEP BLUE BRAND BLOCK TABLE STYLING --- */
+            /* --- DEEP BLUE BRAND BLOCK STYLING --- */
             .custom-dashboard-table {
                 border: 2px solid #1e3a8a !important;
                 border-collapse: collapse !important;
@@ -60,7 +60,7 @@ hide_streamlit_style = """
                 border-bottom: 2px solid #1e3a8a !important;
             }
             
-            /* Dynamic block separation for every brand section (applies a thick deep blue border at the end of each brand group's columns) */
+            /* Block Dividers for Each Brand Section Group */
             .custom-dashboard-table td:nth-child(4),
             .custom-dashboard-table th:nth-child(4),
             .custom-dashboard-table td:nth-child(7),
