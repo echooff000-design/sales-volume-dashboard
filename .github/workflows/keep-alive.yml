@@ -1,0 +1,15 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Runs every 12 hours to prevent the app from sleeping
+    - cron: '0 */12 * * *'
+  workflow_dispatch: # Allows you to run it manually if needed
+
+jobs:
+  ping-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Dashboard URL
+        # The -sL flag follows redirects silently, and we discard the output
+        run: curl -sL https://wbsale.streamlit.app/ > /dev/null
