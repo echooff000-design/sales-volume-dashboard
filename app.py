@@ -10,11 +10,23 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & ADD THIN BORDER CSS ---
+# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / TABLE CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            
+            /* --- FORCE SIDEBAR TO STAY DARK & VISIBLE IN ALL MODES --- */
+            [data-testid="stSidebar"] {
+                background-color: #0f172a !important;
+                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            }
+            [data-testid="stSidebar"] * {
+                color: #f8fafc !important;
+            }
+            [data-testid="stSidebar"] a {
+                color: #60a5fa !important;
+            }
             
             /* --- FREEZE PANE STICKY COLUMN STYLING --- */
             .table-wrapper th:first-child,
