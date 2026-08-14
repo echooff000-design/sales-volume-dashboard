@@ -10,7 +10,7 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & ADD STICKY COLUMN / BORDER CSS ---
+# --- HIDE STREAMLIT BRANDING & ADD STICKY COLUMN / FORCED GRID BORDER CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -23,7 +23,7 @@ hide_streamlit_style = """
                 left: 0 !important;
                 z-index: 2 !important;
                 background-color: #F2F2F2 !important;
-                border-right: 2px solid #b0c4de !important;
+                border-right: 2px solid #8EA9DB !important;
             }
             .table-wrapper th:first-child {
                 background-color: #D9E1F2 !important;
@@ -39,9 +39,12 @@ hide_streamlit_style = """
                 background-color: #D9E1F2 !important;
             }
             
-            /* --- PROPER GRID BORDERS FOR ALL BRAND & TOTAL ROWS --- */
-            .custom-dashboard-table th, .custom-dashboard-table td {
-                border: 1px solid #D9D9D9 !important;
+            /* --- FORCED PROPER GRID BORDERS FOR EVERY CELL --- */
+            .custom-dashboard-table, 
+            .custom-dashboard-table th, 
+            .custom-dashboard-table td {
+                border: 1px solid #b0b0b0 !important;
+                border-collapse: collapse !important;
             }
             </style>
             """
@@ -263,8 +266,8 @@ st.markdown("""
     }
 
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; }
-    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 3px 2px; text-align: center; white-space: nowrap !important; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #b0b0b0 !important; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #b0b0b0 !important; padding: 3px 2px; text-align: center; white-space: nowrap !important; }
     .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #8EA9DB; font-size: 8px; white-space: nowrap !important; }
     .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
     .brand-row { background-color: #FFFFFF; color: #000000; }
