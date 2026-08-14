@@ -32,10 +32,17 @@ hide_streamlit_style = """
             [data-testid="stSidebar"] .stButton button, 
             [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
                 background-color: #1e293b !important;
-                color: #f8fafc !important;
-                border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                color: #ffffff !important;
+                border: 1px solid rgba(255, 255, 255, 0.25) !important;
                 border-radius: 8px !important;
                 width: 100% !important;
+            }
+            [data-testid="stSidebar"] .stButton button p, 
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button p,
+            [data-testid="stSidebar"] .stButton button span, 
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button span {
+                color: #ffffff !important;
+                font-weight: 600 !important;
             }
             [data-testid="stSidebar"] .stButton button:hover, 
             [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
@@ -520,6 +527,14 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
+# --- HELPER FUNCTION TO SORT ASMS (PUSHING "Key Accounts" TO BOTTOM) ---
+def sort_asms(asm_list):
+    # Filter out empty/nan values and sort alphabetically, but push 'Key Accounts' to the end
+    valid_asms = [str(a) for a in asm_list if str(a).lower() not in ["nan", "none", ""]]
+    sorted_normal = sorted([a for a in valid_asms if a.strip().lower() != "key accounts"])
+    key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
+    return sorted_normal + key_accounts
+
 # --- 9. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
@@ -652,9 +667,8 @@ def generate_hierarchy_table_1(df):
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
         html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
 
-        asms = z_df['ASM'].dropna().unique()
-        for asm in sorted(asms):
-            if str(asm).lower() in ["nan", "none", ""]: continue
+        asms = sort_asms(z_df['ASM'].dropna().unique())
+        for asm in asms:
             a_df = z_df[z_df['ASM'] == asm]
             a_lm_i = a_df[a_df['Brand']=='IBDC']['Last Month'].sum()
             a_tgt_i = a_df[a_df['Brand']=='IBDC']['Target'].sum()
@@ -719,9 +733,8 @@ def generate_hierarchy_table_2(df):
             html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
         html += '</tr>'
 
-        asms = z_df['ASM'].dropna().unique()
-        for asm in sorted(asms):
-            if str(asm).lower() in ["nan", "none", ""]: continue
+        asms = sort_asms(z_df['ASM'].dropna().unique())
+        for asm in asms:
             a_df = z_df[z_df['ASM'] == asm]
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             for b in brands_to_show:
@@ -774,9 +787,8 @@ def generate_hierarchy_table_3(df):
             html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
         html += '</tr>'
 
-        asms = z_df['ASM'].dropna().unique()
-        for asm in sorted(asms):
-            if str(asm).lower() in ["nan", "none", ""]: continue
+        asms = sort_asms(z_df['ASM'].dropna().unique())
+        for asm in asms:
             a_df = z_df[z_df['ASM'] == asm]
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             for b in brands_to_show:
