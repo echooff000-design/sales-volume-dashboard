@@ -122,7 +122,6 @@ df_users = df_users.rename(columns={
     col_map["password"]: "password"
 })
 
-# Check for existing cookie safely
 cached_user = None
 try:
     cached_user = cookie_manager.get(cookie="wb_sale_user")
@@ -156,7 +155,6 @@ if not st.session_state["authenticated"]:
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
         with st.form("login_form"):
             
-            # --- FIXED HTML LOGO RENDERING (LOCKED TO EXACT CENTER) ---
             try:
                 with open("logo.png", "rb") as img_file:
                     encoded_img = base64.b64encode(img_file.read()).decode()
@@ -547,6 +545,24 @@ def calc_ms_mhw_lm(sub_df):
     denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['Last Month'].sum()
     return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
 
+# Generic helper for individual brand share calculation if segment is needed, 
+# or direct share if brand stands alone. For general brands, we calculate share against segment or total if applicable.
+# Here we calculate general brand share or values based on brand totals across sub_df.
+def get_brand_metrics(sub_df, brand_name):
+    lm = sub_df[sub_df['Brand'] == brand_name]['Last Month'].sum()
+    mtd = sub_df[sub_df['Brand'] == brand_name]['This Month'].sum()
+    
+    # Calculate state/filtered total volume for percentage share calculation denominator if needed,
+    # or return raw totals if percentage of total volume is preferred. 
+    # In table 2, values are displayed as percentages. Let's compute brand's share of total volume or segment.
+    total_vol_lm = sub_df['Last Month'].sum()
+    total_vol_mtd = sub_df['This Month'].sum()
+    
+    lm_pct = (lm / total_vol_lm * 100) if total_vol_lm > 0 else 0.0
+    mtd_pct = (mtd / total_vol_mtd * 100) if total_vol_mtd > 0 else 0.0
+    diff = mtd_pct - lm_pct
+    return lm_pct, mtd_pct, diff
+
 def generate_hierarchy_table_1(df):
     brands_to_show = ["IBDC", "MHW"]
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
@@ -629,7 +645,9 @@ def generate_hierarchy_table_1(df):
     return html
 
 def generate_hierarchy_table_2(df):
-    brands_to_show = ["IBDC", "MHW"]
+    # Updated requested brands list
+    brands_to_show = ["IBDC", "MCD Lux", "IQ", "N1WSUP", "OCBL", "RSW", "SRB7", "RGW", "MHW"]
+    
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
     for b in brands_to_show:
@@ -639,64 +657,53 @@ def generate_hierarchy_table_2(df):
         html += '<th>LM</th><th>MTD</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
-    wb_ibdc_lm = calc_ms_ibdc_lm(df)
-    wb_ibdc_mtd = calc_ms_ibdc(df)
-    wb_ibdc_diff = wb_ibdc_mtd - wb_ibdc_lm
+    def get_brand_cell_values(sub_df, b_name):
+        if b_name == "IBDC":
+            lm = calc_ms_ibdc_lm(sub_df)
+            mtd = calc_ms_ibdc(sub_df)
+        elif b_name == "MHW":
+            lm = calc_ms_mhw_lm(sub_df)
+            mtd = calc_ms_mhw(sub_df)
+        else:
+            lm, mtd, _ = get_brand_metrics(sub_df, b_name)
+        diff = mtd - lm
+        return lm, mtd, diff
 
-    wb_mhw_lm = calc_ms_mhw_lm(df)
-    wb_mhw_mtd = calc_ms_mhw(df)
-    wb_mhw_diff = wb_mhw_mtd - wb_mhw_lm
-
+    # Grand Total Row
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
-    html += f'<td>{wb_ibdc_lm:.1f}%</td><td>{wb_ibdc_mtd:.1f}%</td><td style="color: {"#9b1c1c" if wb_ibdc_diff < 0 else "#03543f"};">{wb_ibdc_diff:+.1f}%</td>'
-    html += f'<td>{wb_mhw_lm:.1f}%</td><td>{wb_mhw_mtd:.1f}%</td><td style="color: {"#9b1c1c" if wb_mhw_diff < 0 else "#03543f"};">{wb_mhw_diff:+.1f}%</td></tr>'
+    for b in brands_to_show:
+        lm, mtd, diff = get_brand_cell_values(df, b)
+        html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
+    html += '</tr>'
 
     zones = df['Zone'].dropna().unique()
     for zone in sorted(zones):
         z_df = df[df['Zone'] == zone]
-        z_i_lm = calc_ms_ibdc_lm(z_df)
-        z_i_mtd = calc_ms_ibdc(z_df)
-        z_i_diff = z_i_mtd - z_i_lm
-
-        z_m_lm = calc_ms_mhw_lm(z_df)
-        z_m_mtd = calc_ms_mhw(z_df)
-        z_m_diff = z_m_mtd - z_m_lm
-
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
-        html += f'<td>{z_i_lm:.1f}%</td><td>{z_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if z_i_diff < 0 else "#03543f"};">{z_i_diff:+.1f}%</td>'
-        html += f'<td>{z_m_lm:.1f}%</td><td>{z_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if z_m_diff < 0 else "#03543f"};">{z_m_diff:+.1f}%</td></tr>'
+        for b in brands_to_show:
+            lm, mtd, diff = get_brand_cell_values(z_df, b)
+            html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
+        html += '</tr>'
 
         asms = z_df['ASM'].dropna().unique()
         for asm in sorted(asms):
             if str(asm).lower() in ["nan", "none", ""]: continue
             a_df = z_df[z_df['ASM'] == asm]
-            a_i_lm = calc_ms_ibdc_lm(a_df)
-            a_i_mtd = calc_ms_ibdc(a_df)
-            a_i_diff = a_i_mtd - a_i_lm
-
-            a_m_lm = calc_ms_mhw_lm(a_df)
-            a_m_mtd = calc_ms_mhw(a_df)
-            a_m_diff = a_m_mtd - a_m_lm
-
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
-            html += f'<td>{a_i_lm:.1f}%</td><td>{a_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if a_i_diff < 0 else "#03543f"};">{a_i_diff:+.1f}%</td>'
-            html += f'<td>{a_m_lm:.1f}%</td><td>{a_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if a_m_diff < 0 else "#03543f"};">{a_m_diff:+.1f}%</td></tr>'
+            for b in brands_to_show:
+                lm, mtd, diff = get_brand_cell_values(a_df, b)
+                html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
+            html += '</tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
                 if str(tse).lower() in ["nan", "none", ""]: continue
                 t_df = a_df[a_df['TSE'] == tse]
-                t_i_lm = calc_ms_ibdc_lm(t_df)
-                t_i_mtd = calc_ms_ibdc(t_df)
-                t_i_diff = t_i_mtd - t_i_lm
-
-                t_m_lm = calc_ms_mhw_lm(t_df)
-                t_m_mtd = calc_ms_mhw(t_df)
-                t_m_diff = t_m_mtd - t_m_lm
-
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{t_i_lm:.1f}%</td><td>{t_i_mtd:.1f}%</td><td style="color: {"#9b1c1c" if t_i_diff < 0 else "#03543f"};">{t_i_diff:+.1f}%</td>'
-                html += f'<td>{t_m_lm:.1f}%</td><td>{t_m_mtd:.1f}%</td><td style="color: {"#9b1c1c" if t_m_diff < 0 else "#03543f"};">{t_m_diff:+.1f}%</td></tr>'
+                for b in brands_to_show:
+                    lm, mtd, diff = get_brand_cell_values(t_df, b)
+                    html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
+                html += '</tr>'
 
     html += '</tbody></table></div>'
     return html
