@@ -4,6 +4,7 @@ import requests
 import io
 import datetime
 import os
+import base64
 import extra_streamlit_components as stx
 
 # --- 1. PAGE CONFIGURATION ---
@@ -121,8 +122,12 @@ df_users = df_users.rename(columns={
     col_map["password"]: "password"
 })
 
-# Check for existing cookie
-cached_user = cookie_manager.get(cookie="wb_sale_user")
+# Check for existing cookie safely
+cached_user = None
+try:
+    cached_user = cookie_manager.get(cookie="wb_sale_user")
+except Exception:
+    pass
 
 if "authenticated" not in st.session_state:
     if cached_user:
@@ -138,24 +143,6 @@ if not st.session_state["authenticated"]:
         .stApp { background-color: #0f172a !important; }
         [data-testid="stForm"] { background: rgba(30, 41, 59, 0.7) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
         
-        /* --- ABSOLUTE CENTER ALIGNMENT FOR LOGO --- */
-        [data-testid="stForm"] [data-testid="stImage"] {
-            display: flex !important;
-            justify-content: center !important;
-            width: 100% !important;
-        }
-        [data-testid="stForm"] [data-testid="stImage"] > div {
-            margin: 0 auto !important;
-            display: flex !important;
-            justify-content: center !important;
-        }
-        [data-testid="stForm"] [data-testid="stImage"] img {
-            display: block !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            max-width: 120px !important;
-        }
-
         .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
         .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; transition: all 0.3s ease; }
         .stTextInput input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
@@ -168,8 +155,19 @@ if not st.session_state["authenticated"]:
     with col2:
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
         with st.form("login_form"):
+            
+            # --- FIXED HTML LOGO RENDERING (LOCKED TO EXACT CENTER) ---
             try:
-                st.image("logo.png", width=100)
+                with open("logo.png", "rb") as img_file:
+                    encoded_img = base64.b64encode(img_file.read()).decode()
+                st.markdown(
+                    f"""
+                    <div style="display: flex; justify-content: center; width: 100%; margin-bottom: 10px;">
+                        <img src="data:image/png;base64,{encoded_img}" style="width: 100px; display: block;" />
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
             except Exception:
                 pass
                     
@@ -191,7 +189,10 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
                     
-                    cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
+                    try:
+                        cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
+                    except Exception:
+                        pass
                     
                     try:
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -260,7 +261,10 @@ with col_title:
 with col_logout:
     st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #f8fafc;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
     if st.button("Logout"):
-        cookie_manager.delete("wb_sale_user")
+        try:
+            cookie_manager.delete("wb_sale_user")
+        except Exception:
+            pass
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
         st.rerun()
