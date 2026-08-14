@@ -524,24 +524,36 @@ def generate_html_table(df, metric_type="Volume"):
     return html
 
 # --- 10. UPDATED HIERARCHY REPORT GENERATORS ---
-def get_segment_for_brand(b_name):
-    # Maps brand to its parent segment denominator group
-    if b_name == "MHW":
-        return ["Semi Premium-Whisky"]
-    elif b_name in ["IBDC", "N1WSUP", "OCBL", "RSW", "SRB7", "RGW", "MCD Lux", "IQ"]:
-        return ["Deluxe-Whisky", "Deluxe Plus-Whisky"]
-    return ["Deluxe-Whisky", "Deluxe Plus-Whisky"]
+def calc_ms_ibdc(sub_df):
+    ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['This Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['This Month'].sum()
+    return (ibdc_vol / denom_vol * 100) if denom_vol > 0 else 0.0
 
-def calc_ms_brand(sub_df, b_name):
-    target_segs = get_segment_for_brand(b_name)
-    brand_lm = sub_df[sub_df['Brand'] == b_name]['Last Month'].sum()
-    brand_mtd = sub_df[sub_df['Brand'] == b_name]['This Month'].sum()
+def calc_ms_mhw(sub_df):
+    mhw_vol = sub_df[sub_df['Brand'] == 'MHW']['This Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['This Month'].sum()
+    return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
+def calc_ms_ibdc_lm(sub_df):
+    ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['Last Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['Last Month'].sum()
+    return (ibdc_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
+def calc_ms_mhw_lm(sub_df):
+    mhw_vol = sub_df[sub_df['Brand'] == 'MHW']['Last Month'].sum()
+    denom_vol = sub_df[sub_df['Segment'] == 'Semi Premium-Whisky']['Last Month'].sum()
+    return (mhw_vol / denom_vol * 100) if denom_vol > 0 else 0.0
+
+# Consistent brand share calculation against total brand volume sum (matching the Ms% tab logic)
+def get_brand_metrics_total(sub_df, brand_name):
+    total_vol_lm = sub_df['Last Month'].sum()
+    total_vol_mtd = sub_df['This Month'].sum()
     
-    denom_lm = sub_df[sub_df['Segment'].isin(target_segs)]['Last Month'].sum()
-    denom_mtd = sub_df[sub_df['Segment'].isin(target_segs)]['This Month'].sum()
+    lm_vol = sub_df[sub_df['Brand'] == brand_name]['Last Month'].sum()
+    mtd_vol = sub_df[sub_df['Brand'] == brand_name]['This Month'].sum()
     
-    lm_pct = (brand_lm / denom_lm * 100) if denom_lm > 0 else 0.0
-    mtd_pct = (brand_mtd / denom_mtd * 100) if denom_mtd > 0 else 0.0
+    lm_pct = (lm_vol / total_vol_lm * 100) if total_vol_lm > 0 else 0.0
+    mtd_pct = (mtd_vol / total_vol_mtd * 100) if total_vol_mtd > 0 else 0.0
     diff = mtd_pct - lm_pct
     return lm_pct, mtd_pct, diff
 
@@ -559,12 +571,12 @@ def generate_hierarchy_table_1(df):
     tot_lm_ibdc = df[df['Brand']=='IBDC']['Last Month'].sum()
     tot_tgt_ibdc = df[df['Brand']=='IBDC']['Target'].sum()
     tot_mtd_ibdc = df[df['Brand']=='IBDC']['This Month'].sum()
-    ms_ibdc, _, _ = calc_ms_brand(df, "IBDC")
+    ms_ibdc = calc_ms_ibdc(df)
 
     tot_lm_mhw = df[df['Brand']=='MHW']['Last Month'].sum()
     tot_tgt_mhw = df[df['Brand']=='MHW']['Target'].sum()
     tot_mtd_mhw = df[df['Brand']=='MHW']['This Month'].sum()
-    ms_mhw, _, _ = calc_ms_brand(df, "MHW")
+    ms_mhw = calc_ms_mhw(df)
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     html += f'<td>{int(tot_lm_ibdc):,}</td><td>{int(tot_tgt_ibdc):,}</td><td>{int(tot_mtd_ibdc):,}</td><td>{ms_ibdc:.1f}%</td>'
@@ -576,12 +588,12 @@ def generate_hierarchy_table_1(df):
         z_lm_i = z_df[z_df['Brand']=='IBDC']['Last Month'].sum()
         z_tgt_i = z_df[z_df['Brand']=='IBDC']['Target'].sum()
         z_mtd_i = z_df[z_df['Brand']=='IBDC']['This Month'].sum()
-        z_ms_i, _, _ = calc_ms_brand(z_df, "IBDC")
+        z_ms_i = calc_ms_ibdc(z_df)
 
         z_lm_m = z_df[z_df['Brand']=='MHW']['Last Month'].sum()
         z_tgt_m = z_df[z_df['Brand']=='MHW']['Target'].sum()
         z_mtd_m = z_df[z_df['Brand']=='MHW']['This Month'].sum()
-        z_ms_m, _, _ = calc_ms_brand(z_df, "MHW")
+        z_ms_m = calc_ms_mhw(z_df)
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
@@ -594,12 +606,12 @@ def generate_hierarchy_table_1(df):
             a_lm_i = a_df[a_df['Brand']=='IBDC']['Last Month'].sum()
             a_tgt_i = a_df[a_df['Brand']=='IBDC']['Target'].sum()
             a_mtd_i = a_df[a_df['Brand']=='IBDC']['This Month'].sum()
-            a_ms_i, _, _ = calc_ms_brand(a_df, "IBDC")
+            a_ms_i = calc_ms_ibdc(a_df)
 
             a_lm_m = a_df[a_df['Brand']=='MHW']['Last Month'].sum()
             a_tgt_m = a_df[a_df['Brand']=='MHW']['Target'].sum()
             a_mtd_m = a_df[a_df['Brand']=='MHW']['This Month'].sum()
-            a_ms_m, _, _ = calc_ms_brand(a_df, "MHW")
+            a_ms_m = calc_ms_mhw(a_df)
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
@@ -612,12 +624,12 @@ def generate_hierarchy_table_1(df):
                 t_lm_i = t_df[t_df['Brand']=='IBDC']['Last Month'].sum()
                 t_tgt_i = t_df[t_df['Brand']=='IBDC']['Target'].sum()
                 t_mtd_i = t_df[t_df['Brand']=='IBDC']['This Month'].sum()
-                t_ms_i, _, _ = calc_ms_brand(t_df, "IBDC")
+                t_ms_i = calc_ms_ibdc(t_df)
 
                 t_lm_m = t_df[t_df['Brand']=='MHW']['Last Month'].sum()
                 t_tgt_m = t_df[t_df['Brand']=='MHW']['Target'].sum()
                 t_mtd_m = t_df[t_df['Brand']=='MHW']['This Month'].sum()
-                t_ms_m, _, _ = calc_ms_brand(t_df, "MHW")
+                t_ms_m = calc_ms_mhw(t_df)
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
                 html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
@@ -638,10 +650,23 @@ def generate_hierarchy_table_2(df):
         html += '<th>LM</th><th>MTD</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
+    def get_brand_cell_values(sub_df, b_name):
+        if b_name == "IBDC":
+            lm = calc_ms_ibdc_lm(sub_df)
+            mtd = calc_ms_ibdc(sub_df)
+            diff = mtd - lm
+        elif b_name == "MHW":
+            lm = calc_ms_mhw_lm(sub_df)
+            mtd = calc_ms_mhw(sub_df)
+            diff = mtd - lm
+        else:
+            lm, mtd, diff = get_brand_metrics_total(sub_df, b_name)
+        return lm, mtd, diff
+
     # Grand Total Row
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     for b in brands_to_show:
-        lm, mtd, diff = calc_ms_brand(df, b)
+        lm, mtd, diff = get_brand_cell_values(df, b)
         html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
     html += '</tr>'
 
@@ -650,7 +675,7 @@ def generate_hierarchy_table_2(df):
         z_df = df[df['Zone'] == zone]
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         for b in brands_to_show:
-            lm, mtd, diff = calc_ms_brand(z_df, b)
+            lm, mtd, diff = get_brand_cell_values(z_df, b)
             html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
         html += '</tr>'
 
@@ -660,7 +685,7 @@ def generate_hierarchy_table_2(df):
             a_df = z_df[z_df['ASM'] == asm]
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             for b in brands_to_show:
-                lm, mtd, diff = calc_ms_brand(a_df, b)
+                lm, mtd, diff = get_brand_cell_values(a_df, b)
                 html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
             html += '</tr>'
 
@@ -670,7 +695,7 @@ def generate_hierarchy_table_2(df):
                 t_df = a_df[a_df['TSE'] == tse]
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
                 for b in brands_to_show:
-                    lm, mtd, diff = calc_ms_brand(t_df, b)
+                    lm, mtd, diff = get_brand_cell_values(t_df, b)
                     html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
                 html += '</tr>'
 
