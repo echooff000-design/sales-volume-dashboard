@@ -138,15 +138,21 @@ if not st.session_state["authenticated"]:
         .stApp { background-color: #0f172a !important; }
         [data-testid="stForm"] { background: rgba(30, 41, 59, 0.7) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
         
-        /* --- PERFECTLY CENTER LOGO ACROSS ALL RESOLUTIONS --- */
+        /* --- ABSOLUTE CENTER ALIGNMENT FOR LOGO --- */
         [data-testid="stForm"] [data-testid="stImage"] {
             display: flex !important;
             justify-content: center !important;
+            width: 100% !important;
+        }
+        [data-testid="stForm"] [data-testid="stImage"] > div {
             margin: 0 auto !important;
+            display: flex !important;
+            justify-content: center !important;
         }
         [data-testid="stForm"] [data-testid="stImage"] img {
             display: block !important;
-            margin: 0 auto !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
             max-width: 120px !important;
         }
 
