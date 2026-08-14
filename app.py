@@ -10,7 +10,7 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & ADD PROMINENT GRID BORDER CSS ---
+# --- HIDE STREAMLIT BRANDING & ADD CLEAN HORIZONTAL-ONLY BORDER CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -39,17 +39,24 @@ hide_streamlit_style = """
                 background-color: #D9E1F2 !important;
             }
             
-            /* --- PROMINENT GRID BORDERS (MATCHING REFERENCE IMAGE) --- */
+            /* --- CLEAN HORIZONTAL LINES & VERTICAL BRAND SECTION DIVIDERS --- */
             .custom-dashboard-table {
                 border: 2px solid #000000 !important;
                 border-collapse: collapse !important;
             }
             .custom-dashboard-table th, .custom-dashboard-table td {
-                border: 1px solid #000000 !important;
+                border: none !important;
+                border-bottom: 1px solid #d3d3d3 !important;
+                border-right: 1px solid #e0e0e0 !important;
                 padding: 4px 3px !important;
             }
             .custom-dashboard-table th {
                 border-bottom: 2px solid #000000 !important;
+            }
+            /* Add a thicker vertical separator between major brand groups or sections if needed */
+            .custom-dashboard-table td:nth-child(4),
+            .custom-dashboard-table th:nth-child(4) {
+                border-right: 2px solid #000000 !important;
             }
             </style>
             """
@@ -272,7 +279,7 @@ st.markdown("""
 
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
     .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 2px solid #000000 !important; }
-    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #000000 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: none !important; border-bottom: 1px solid #d3d3d3 !important; border-right: 1px solid #e0e0e0 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
     .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #000000 !important; font-size: 8px; white-space: nowrap !important; }
     .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
     .brand-row { background-color: #FFFFFF; color: #000000; }
