@@ -4,6 +4,7 @@ import requests
 import io
 import datetime
 import os
+import extra_streamlit_components as stx
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
@@ -17,7 +18,58 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- 2. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
+# --- 2. AUTOMATIC LOG FILE FIXER (SELF-HEALING) ---
+# This block automatically fixes the shifted columns in your existing CSV
+csv_file = "login_logs.csv"
+if os.path.exists(csv_file):
+    try:
+        with open(csv_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        # If the file doesn't start with the correct new headers, fix it
+        if len(lines) > 0 and not lines[0].startswith("Year,Date,Time,Name,User ID"):
+            new_lines = ["Year,Date,Time,Name,User ID\n"]
+            for line in lines:
+                line = line.strip()
+                if not line: continue
+                parts = line.split(",")
+                
+                # Skip old headers
+                if parts[0] == "Name" or parts[0] == "Year": 
+                    continue
+                    
+                # Fix the old 3-column rows (The first 19 rows)
+                if len(parts) == 3: 
+                    name, uid, time_val = parts[0], parts[1], parts[2]
+                    try:
+                        dt = pd.to_datetime(time_val)
+                        year = str(dt.year)
+                        date = dt.strftime("%Y-%m-%d")
+                        time_str = dt.strftime("%H:%M:%S")
+                    except:
+                        year = "2026"
+                        date = time_val[:10]
+                        time_str = time_val[11:]
+                    new_lines.append(f"{year},{date},{time_str},{name},{uid}\n")
+                    
+                # Keep the new 5-column rows (Row 20 onwards)
+                elif len(parts) >= 5: 
+                    new_lines.append(line + "\n")
+            
+            # Save the perfectly formatted file back
+            with open(csv_file, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+    except Exception as e:
+        pass
+
+# --- 3. COOKIE MANAGER SETUP ---
+@st.cache_resource(experimental_allow_widgets=True)
+def get_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_manager()
+
+# --- 4. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 @st.cache_data(ttl=300)
@@ -49,7 +101,7 @@ if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
     st.stop()
 
-# --- 3. LOGIN CREDENTIAL SYSTEM ---
+# --- 5. LOGIN CREDENTIAL SYSTEM ---
 if "Users" not in dfs:
     st.error("❌ Could not find the 'Users' sheet in your Excel file. Please add it with columns: Name, user_id, password.")
     st.stop()
@@ -76,9 +128,16 @@ df_users = df_users.rename(columns={
     col_map["password"]: "password"
 })
 
+# Check for existing cookie
+cached_user = cookie_manager.get(cookie="wb_sale_user")
+
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-    st.session_state["user_name"] = ""
+    if cached_user:
+        st.session_state["authenticated"] = True
+        st.session_state["user_name"] = cached_user
+    else:
+        st.session_state["authenticated"] = False
+        st.session_state["user_name"] = ""
 
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -122,21 +181,25 @@ if not st.session_state["authenticated"]:
                 if not user_match.empty:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    
+                    # Set a cookie to keep user logged in for 30 days
+                    cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
+                    
                     try:
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         now = datetime.datetime.now(ist_timezone)
                         log_data = pd.DataFrame([{
                             "Year": now.year,
                             "Date": now.strftime("%Y-%m-%d"),
-                            "Time (IST)": now.strftime("%I:%M:%S %p"),
+                            "Time": now.strftime("%H:%M:%S"),
                             "Name": st.session_state["user_name"],
                             "User ID": input_user
                         }])
-                        csv_file = "login_logs.csv"
                         file_exists = os.path.exists(csv_file)
                         log_data.to_csv(csv_file, mode='a', header=not file_exists, index=False, encoding='utf-8')
                     except Exception as e:
                         print(f"Log error: {e}")
+                    
                     st.rerun()
                 else:
                     st.error("❌ Invalid User ID or Password")
@@ -190,6 +253,8 @@ with col_title:
 with col_logout:
     st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #f8fafc;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
     if st.button("Logout"):
+        # Delete cookie and clear session to properly logout
+        cookie_manager.delete("wb_sale_user")
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
         st.rerun()
@@ -213,7 +278,7 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
 
-# --- 4. FETCH DATA FROM SHEETS ---
+# --- 6. FETCH DATA FROM SHEETS ---
 required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
 for sheet in required_sheets:
     if sheet not in dfs:
@@ -295,7 +360,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
 
-# --- 5. EXACT ORDER MAPPING & DATA CONVERSION ---
+# --- 7. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
 for col in num_cols:
     if col not in df_raw.columns:
@@ -335,7 +400,7 @@ df_raw[brand_col] = pd.Categorical(df_raw[brand_col], categories=final_brand_ord
 
 master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_values(by=[seg_col, brand_col])
 
-# --- 6. CASCADING SIDEBAR FILTERS ---
+# --- 8. CASCADING SIDEBAR FILTERS ---
 st.markdown("<h3 style='color: #f8fafc; font-size: 20px;'>🔍 Filters</h3>", unsafe_allow_html=True)
 col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -382,7 +447,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- 7. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
+# --- 9. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -451,7 +516,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# --- 8. UPDATED HIERARCHY REPORT GENERATORS ---
+# --- 10. UPDATED HIERARCHY REPORT GENERATORS ---
 def calc_ms_ibdc(sub_df):
     ibdc_vol = sub_df[sub_df['Brand'] == 'IBDC']['This Month'].sum()
     denom_vol = sub_df[sub_df['Segment'].isin(['Deluxe-Whisky', 'Deluxe Plus-Whisky'])]['This Month'].sum()
@@ -681,7 +746,7 @@ def generate_hierarchy_table_3(df):
     html += '</tbody></table></div>'
     return html
 
-# --- 9. DISPLAY MAIN TABS ---
+# --- 11. DISPLAY MAIN TABS ---
 st.markdown("---")
 
 main_tab1, main_tab2, main_tab3 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Dashboard"])
