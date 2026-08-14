@@ -764,7 +764,7 @@ with main_tab3:
 
 with main_tab4:
     st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Select a common query or type your own question below to analyze your data.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Select a common query or type your question below (e.g., 'Sale details of IBDC, MHW this month').</p>", unsafe_allow_html=True)
 
     query_type = st.selectbox(
         "Choose a common question:",
@@ -778,9 +778,9 @@ with main_tab4:
     )
 
     custom_query = st.text_input("Or type your own question / search term:")
-    active_query = custom_query if custom_query else query_type
+    active_query = custom_query.lower() if custom_query else query_type.lower()
 
-    if "haven't billed ibdc" in active_query.lower() or query_type == "Outlets that haven't billed IBDC this month":
+    if "haven't billed ibdc" in active_query or query_type == "Outlets that haven't billed IBDC this month":
         st.markdown("#### Outlets in your filter scope with 0 IBDC volume this month:")
         if "Brand" in filtered_df.columns and "Outlet Name" in filtered_df.columns:
             all_outlets = filtered_df[["LIC No", "Outlet Name", "ASM", "TSE", "Group"]].drop_duplicates()
@@ -795,20 +795,20 @@ with main_tab4:
         else:
             st.warning("Required columns not found.")
 
-    elif "top 10" in active_query.lower() or query_type == "Top 10 performing outlets by Volume (This Month)":
+    elif "top 10" in active_query or query_type == "Top 10 performing outlets by Volume (This Month)":
         st.markdown("#### Top 10 Outlets by This Month Volume:")
         if "Outlet Name" in filtered_df.columns:
             top_outlets = filtered_df.groupby(["LIC No", "Outlet Name", "ASM", "Zone"], observed=False)["This Month"].sum().reset_index()
             top_outlets = top_outlets.sort_values(by="This Month", ascending=False).head(10)
             st.dataframe(top_outlets, use_container_width=True)
 
-    elif "zero volume" in active_query.lower() or query_type == "Outlets with Zero Volume (This Month)":
+    elif "zero volume" in active_query or query_type == "Outlets with Zero Volume (This Month)":
         st.markdown("#### Outlets with 0 Total Volume This Month:")
         outlet_sums = filtered_df.groupby(["LIC No", "Outlet Name", "ASM"], observed=False)["This Month"].sum().reset_index()
         zero_vol = outlet_sums[outlet_sums["This Month"] == 0]
         st.dataframe(zero_vol, use_container_width=True)
 
-    elif "negative growth" in active_query.lower() or query_type == "Brands with negative growth compared to Last Month":
+    elif "negative growth" in active_query or query_type == "Brands with negative growth compared to Last Month":
         st.markdown("#### Brands experiencing a drop from Last Month to This Month:")
         brand_comp = filtered_df.groupby("Brand", observed=False)[["Last Month", "This Month"]].sum().reset_index()
         brand_comp["Difference"] = brand_comp["This Month"] - brand_comp["Last Month"]
@@ -816,11 +816,25 @@ with main_tab4:
         st.dataframe(negative_brands, use_container_width=True)
 
     elif custom_query:
-        st.markdown(f"<h4>Search results for: '{custom_query}'</h4>", unsafe_allow_html=True)
-        mask = filtered_df.astype(str).apply(lambda col: col.str.contains(custom_query, case=False, na=False)).any(axis=1)
-        search_results = filtered_df[mask]
+        st.markdown(f"<h4>Results for: '{custom_query}'</h4>", unsafe_allow_html=True)
         
-        if not search_results.empty:
-            st.dataframe(search_results, use_container_width=True)
+        all_brands = filtered_df["Brand"].dropna().astype(str).unique()
+        mentioned_brands = [b for b in all_brands if b.lower() in active_query]
+        
+        if mentioned_brands:
+            brand_filtered = filtered_df[filtered_df["Brand"].isin(mentioned_brands)]
+            summary_df = brand_filtered.groupby(["Brand", "Segment"], observed=False)[["Last Month", "Target", "This Month"]].sum().reset_index()
+            st.markdown("**Brand Performance Summary:**")
+            st.dataframe(summary_df, use_container_width=True)
+            
+            st.markdown("**Detailed Outlet Breakdown for Mentioned Brands:**")
+            detail_df = brand_filtered[["LIC No", "Outlet Name", "Brand", "Last Month", "Target", "This Month", "ASM"]].drop_duplicates()
+            st.dataframe(detail_df, use_container_width=True)
         else:
-            st.info("ℹ️ No matching records found for your query in the current filter scope.")
+            mask = filtered_df.astype(str).apply(lambda col: col.str.contains(custom_query, case=False, na=False)).any(axis=1)
+            search_results = filtered_df[mask]
+            
+            if not search_results.empty:
+                st.dataframe(search_results, use_container_width=True)
+            else:
+                st.info("ℹ️ No matching records found. Try typing brand names like 'IBDC', 'MHW', or 'MCD Lux'.")
