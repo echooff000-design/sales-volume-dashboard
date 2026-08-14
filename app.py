@@ -10,7 +10,7 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / TABLE CSS ---
+# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / BUTTON / TABLE CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -26,6 +26,22 @@ hide_streamlit_style = """
             }
             [data-testid="stSidebar"] a {
                 color: #60a5fa !important;
+            }
+            
+            /* --- FIX SIDEBAR BUTTONS & DOWNLOAD BUTTONS VISIBILITY IN LIGHT/NORMAL MODE --- */
+            [data-testid="stSidebar"] .stButton button, 
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
+                background-color: #1e293b !important;
+                color: #f8fafc !important;
+                border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                border-radius: 8px !important;
+                width: 100% !important;
+            }
+            [data-testid="stSidebar"] .stButton button:hover, 
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
+                background-color: #334155 !important;
+                border-color: #3b82f6 !important;
+                color: #ffffff !important;
             }
             
             /* --- FREEZE PANE STICKY COLUMN STYLING --- */
