@@ -19,14 +19,12 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # --- 2. AUTOMATIC LOG FILE FIXER (SELF-HEALING) ---
-# This block automatically fixes the shifted columns in your existing CSV
 csv_file = "login_logs.csv"
 if os.path.exists(csv_file):
     try:
         with open(csv_file, "r", encoding="utf-8") as f:
             lines = f.readlines()
         
-        # If the file doesn't start with the correct new headers, fix it
         if len(lines) > 0 and not lines[0].startswith("Year,Date,Time,Name,User ID"):
             new_lines = ["Year,Date,Time,Name,User ID\n"]
             for line in lines:
@@ -34,11 +32,9 @@ if os.path.exists(csv_file):
                 if not line: continue
                 parts = line.split(",")
                 
-                # Skip old headers
                 if parts[0] == "Name" or parts[0] == "Year": 
                     continue
                     
-                # Fix the old 3-column rows (The first 19 rows)
                 if len(parts) == 3: 
                     name, uid, time_val = parts[0], parts[1], parts[2]
                     try:
@@ -52,18 +48,15 @@ if os.path.exists(csv_file):
                         time_str = time_val[11:]
                     new_lines.append(f"{year},{date},{time_str},{name},{uid}\n")
                     
-                # Keep the new 5-column rows (Row 20 onwards)
                 elif len(parts) >= 5: 
                     new_lines.append(line + "\n")
             
-            # Save the perfectly formatted file back
             with open(csv_file, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
     except Exception as e:
         pass
 
-# --- 3. COOKIE MANAGER SETUP ---
-@st.cache_resource
+# --- 3. COOKIE MANAGER SETUP (Fixed: Removed cache decorator) ---
 def get_manager():
     return stx.CookieManager()
 
@@ -182,7 +175,6 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
                     
-                    # Set a cookie to keep user logged in for 30 days
                     cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
                     
                     try:
@@ -253,7 +245,6 @@ with col_title:
 with col_logout:
     st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #f8fafc;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
     if st.button("Logout"):
-        # Delete cookie and clear session to properly logout
         cookie_manager.delete("wb_sale_user")
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
@@ -290,7 +281,7 @@ df_last = dfs["Last Month"].copy()
 df_target = dfs["Target Data"].copy()
 df_outlet = dfs["Outlet Master"].copy()
 
-# --- PROCESS OUTLET MASTER FOR MAPPINGS (Zone, ASM, TSE REV, Group) ---
+# --- PROCESS OUTLET MASTER FOR MAPPINGS ---
 df_outlet.columns = df_outlet.columns.astype(str).str.strip()
 if "Outlet Nan" in df_outlet.columns:
     df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
