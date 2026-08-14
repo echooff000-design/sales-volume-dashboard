@@ -4,6 +4,7 @@ import requests
 import io
 import datetime
 import os
+import json
 import base64
 import extra_streamlit_components as stx
 
@@ -130,6 +131,27 @@ if os.path.exists(csv_file):
     except Exception as e:
         pass
 
+# --- CUSTOM QUESTIONS JSON MANAGER ---
+questions_file = "custom_questions.json"
+def load_custom_questions():
+    if os.path.exists(questions_file):
+        try:
+            with open(questions_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_custom_questions(q_list):
+    try:
+        with open(questions_file, "w", encoding="utf-8") as f:
+            json.dump(q_list, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"Error saving questions: {e}")
+
+if "custom_questions" not in st.session_state:
+    st.session_state["custom_questions"] = load_custom_questions()
+
 # --- 3. COOKIE MANAGER SETUP ---
 def get_manager():
     return stx.CookieManager()
@@ -205,9 +227,13 @@ if "authenticated" not in st.session_state:
     if cached_user:
         st.session_state["authenticated"] = True
         st.session_state["user_name"] = cached_user
+        # Look up user_id for cached session if needed
+        match_cached = df_users[df_users["Name"].astype(str).str.strip() == str(cached_user).strip()]
+        st.session_state["user_id"] = match_cached.iloc[0]["user_id"] if not match_cached.empty else ""
     else:
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
+        st.session_state["user_id"] = ""
 
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -258,6 +284,7 @@ if not st.session_state["authenticated"]:
                 if not user_match.empty:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    st.session_state["user_id"] = input_user
                     
                     try:
                         cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
@@ -337,6 +364,7 @@ with col_logout:
             pass
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
+        st.session_state["user_id"] = ""
         st.rerun()
 
 st.sidebar.markdown("📁 **Data Source**")
@@ -354,6 +382,33 @@ if os.path.exists("login_logs.csv"):
         st.sidebar.download_button(label="📥 Download Full Yearly Logs", data=file, file_name="full_yearly_login_logs.csv", mime="text/csv")
 else:
     st.sidebar.info("No login logs yet.")
+
+# --- ADMIN QUESTION MANAGER IN SIDEBAR ---
+# Define who is considered an admin (e.g. Atanu Debnath or specific user IDs, or customize as needed)
+admin_users = ["Atanu Debnath", "admin"] # You can add specific user names/IDs here
+is_admin = st.session_state.get("user_name") in admin_users or st.session_state.get("user_id") in ["admin", "atanu"]
+
+if is_admin:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("⚙️ **Admin Assistant Manager**")
+    with st.sidebar.expander("Manage Assistant Questions"):
+        new_q = st.text_input("Add New Question", placeholder="Type custom question...")
+        if st.button("➕ Add Question"):
+            if new_q and new_q not in st.session_state["custom_questions"]:
+                st.session_state["custom_questions"].append(new_q)
+                save_custom_questions(st.session_state["custom_questions"])
+                st.success("Question added successfully!")
+                st.rerun()
+        
+        if st.session_state["custom_questions"]:
+            st.markdown("**Existing Custom Questions:**")
+            q_to_delete = st.selectbox("Select question to remove", ["-- Select --"] + st.session_state["custom_questions"])
+            if q_to_delete != "-- Select --":
+                if st.button("🗑️ Delete Selected Question"):
+                    st.session_state["custom_questions"].remove(q_to_delete)
+                    save_custom_questions(st.session_state["custom_questions"])
+                    st.success("Question removed!")
+                    st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
@@ -529,7 +584,6 @@ else:
 
 # --- HELPER FUNCTION TO SORT ASMS (PUSHING "Key Accounts" TO BOTTOM) ---
 def sort_asms(asm_list):
-    # Filter out empty/nan values and sort alphabetically, but push 'Key Accounts' to the end
     valid_asms = [str(a) for a in asm_list if str(a).lower() not in ["nan", "none", ""]]
     sorted_normal = sorted([a for a in valid_asms if a.strip().lower() != "key accounts"])
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
@@ -844,16 +898,17 @@ with main_tab4:
     st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Select a common query below to analyze unbilled outlets or top performers based on your active filters.</p>", unsafe_allow_html=True)
 
-    query_type = st.selectbox(
-        "Choose a common question:",
-        [
-            "-- Select a Query --",
-            "Outlets that haven't billed IBDC this month",
-            "Top 10 performing outlets by Volume (This Month)",
-            "Outlets with Zero Volume (This Month)",
-            "Brands with negative growth compared to Last Month"
-        ]
-    )
+    # Combine default built-in queries with admin-managed custom questions
+    default_queries = [
+        "-- Select a Query --",
+        "Outlets that haven't billed IBDC this month",
+        "Top 10 performing outlets by Volume (This Month)",
+        "Outlets with Zero Volume (This Month)",
+        "Brands with negative growth compared to Last Month"
+    ]
+    all_query_options = default_queries + st.session_state["custom_questions"]
+
+    query_type = st.selectbox("Choose a common question:", all_query_options)
 
     if query_type == "Outlets that haven't billed IBDC this month":
         st.markdown("#### Outlets in your filter scope with 0 IBDC volume this month:")
@@ -889,3 +944,10 @@ with main_tab4:
         brand_comp["Difference"] = brand_comp["This Month"] - brand_comp["Last Month"]
         negative_brands = brand_comp[brand_comp["Difference"] < 0].sort_values(by="Difference")
         st.dataframe(negative_brands, use_container_width=True)
+        
+    elif query_type in st.session_state["custom_questions"]:
+        st.markdown(f"#### Results for custom question: *{query_type}*")
+        # Custom questions display filtered data breakdown or summary as a flexible generic output
+        custom_summary = filtered_df.groupby(["LIC No", "Outlet Name", "ASM", "Zone"], observed=False)[["Last Month", "Target", "This Month"]].sum().reset_index()
+        st.dataframe(custom_summary, use_container_width=True)
+        st.download_button("📥 Download Custom Query Report", data=custom_summary.to_csv(index=False).encode('utf-8'), file_name="custom_query_report.csv", mime="text/csv")
