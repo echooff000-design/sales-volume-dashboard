@@ -56,7 +56,7 @@ if os.path.exists(csv_file):
     except Exception as e:
         pass
 
-# --- 3. COOKIE MANAGER SETUP (Fixed: Removed cache decorator) ---
+# --- 3. COOKIE MANAGER SETUP ---
 def get_manager():
     return stx.CookieManager()
 
@@ -137,7 +137,19 @@ if not st.session_state["authenticated"]:
         <style>
         .stApp { background-color: #0f172a !important; }
         [data-testid="stForm"] { background: rgba(30, 41, 59, 0.7) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
-        [data-testid="stForm"] img { max-width: 120px !important; display: block; margin: 0 auto; }
+        
+        /* --- PERFECTLY CENTER LOGO ACROSS ALL RESOLUTIONS --- */
+        [data-testid="stForm"] [data-testid="stImage"] {
+            display: flex !important;
+            justify-content: center !important;
+            margin: 0 auto !important;
+        }
+        [data-testid="stForm"] [data-testid="stImage"] img {
+            display: block !important;
+            margin: 0 auto !important;
+            max-width: 120px !important;
+        }
+
         .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
         .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; transition: all 0.3s ease; }
         .stTextInput input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
@@ -150,12 +162,10 @@ if not st.session_state["authenticated"]:
     with col2:
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
         with st.form("login_form"):
-            col_img1, col_img2, col_img3 = st.columns([1.5, 1, 1.5])
-            with col_img2:
-                try:
-                    st.image("logo.png", use_container_width=True)
-                except Exception:
-                    pass
+            try:
+                st.image("logo.png", width=100)
+            except Exception:
+                pass
                     
             st.markdown("<h2 style='color: #f8fafc; text-align: center; margin-top: 5px; margin-bottom: 5px; font-size: 24px; font-weight: 700;'>Welcome Back</h2>", unsafe_allow_html=True)
             st.markdown("<p style='color: #94a3b8; text-align: center; font-size: 13px; margin-bottom: 25px;'>Sign in to access WB Sale Data Dashboard</p>", unsafe_allow_html=True)
@@ -197,7 +207,7 @@ if not st.session_state["authenticated"]:
                     st.error("❌ Invalid User ID or Password")
     st.stop()
 
-# --- MAIN DASHBOARD STYLING (DEEP BLUE BACKGROUND, ORIGINAL WHITE TABLES) ---
+# --- MAIN DASHBOARD STYLING ---
 st.markdown("""
     <style>
     .stApp { background-color: #0f172a !important; }
@@ -220,7 +230,6 @@ st.markdown("""
         background-color: #ef4444 !important;
     }
 
-    /* --- ORIGINAL WHITE TABLE STYLING & NO WRAPPING --- */
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
     .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; }
     .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #D9D9D9; padding: 3px 2px; text-align: center; white-space: nowrap !important; }
