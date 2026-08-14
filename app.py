@@ -10,11 +10,33 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING ---
+# --- HIDE STREAMLIT BRANDING & ADD STICKY COLUMN CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            
+            /* --- FREEZE PANE STICKY COLUMN STYLING --- */
+            .table-wrapper th:first-child,
+            .table-wrapper td:first-child {
+                position: sticky !important;
+                left: 0 !important;
+                z-index: 2 !important;
+                background-color: #F2F2F2 !important;
+            }
+            .table-wrapper th:first-child {
+                background-color: #D9E1F2 !important;
+                z-index: 3 !important;
+            }
+            .custom-dashboard-table .brand-row td:first-child {
+                background-color: #FFFFFF !important;
+            }
+            .custom-dashboard-table .subtotal-row td:first-child {
+                background-color: #F2F2F2 !important;
+            }
+            .custom-dashboard-table .grand-total-row td:first-child {
+                background-color: #D9E1F2 !important;
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
