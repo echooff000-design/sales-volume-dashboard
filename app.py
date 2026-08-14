@@ -525,7 +525,6 @@ def generate_html_table(df, metric_type="Volume"):
 
 # --- 10. UPDATED HIERARCHY REPORT GENERATORS ---
 def get_segment_for_brand(b_name):
-    # Maps brand to its parent segment denominator group
     if b_name == "MHW":
         return ["Semi Premium-Whisky"]
     elif b_name in ["IBDC", "N1WSUP", "OCBL", "RSW", "SRB7", "RGW", "MCD Lux", "IQ"]:
@@ -735,7 +734,7 @@ def generate_hierarchy_table_3(df):
 # --- 11. DISPLAY MAIN TABS ---
 st.markdown("---")
 
-main_tab1, main_tab2, main_tab3 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Dashboard"])
+main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Dashboard", "💬 Ask Assistant"])
 
 with main_tab1:
     html_vol = generate_html_table(filtered_df, metric_type="Volume")
@@ -762,3 +761,53 @@ with main_tab3:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
         st.write(html_h3, unsafe_allow_html=True)
+
+with main_tab4:
+    st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Select a common query below to analyze unbilled outlets or top performers based on your active filters.</p>", unsafe_allow_html=True)
+
+    query_type = st.selectbox(
+        "Choose a common question:",
+        [
+            "-- Select a Query --",
+            "Outlets that haven't billed IBDC this month",
+            "Top 10 performing outlets by Volume (This Month)",
+            "Outlets with Zero Volume (This Month)",
+            "Brands with negative growth compared to Last Month"
+        ]
+    )
+
+    if query_type == "Outlets that haven't billed IBDC this month":
+        st.markdown("#### Outlets in your filter scope with 0 IBDC volume this month:")
+        if "Brand" in filtered_df.columns and "Outlet Name" in filtered_df.columns:
+            all_outlets = filtered_df[["LIC No", "Outlet Name", "ASM", "TSE", "Group"]].drop_duplicates()
+            ibdc_billed = filtered_df[(filtered_df["Brand"] == "IBDC") & (filtered_df["This Month"] > 0)]["LIC No"].unique()
+            not_billed_df = all_outlets[~all_outlets["LIC No"].isin(ibdc_billed)]
+            
+            if not not_billed_df.empty:
+                st.dataframe(not_billed_df, use_container_width=True)
+                st.download_button("📥 Download Unbilled Outlets CSV", data=not_billed_df.to_csv(index=False).encode('utf-8'), file_name="unbilled_ibdc_outlets.csv", mime="text/csv")
+            else:
+                st.success("🎉 All outlets in this filter scope have billed IBDC this month!")
+        else:
+            st.warning("Required columns ('Brand', 'Outlet Name') not found.")
+
+    elif query_type == "Top 10 performing outlets by Volume (This Month)":
+        st.markdown("#### Top 10 Outlets by This Month Volume:")
+        if "Outlet Name" in filtered_df.columns:
+            top_outlets = filtered_df.groupby(["LIC No", "Outlet Name", "ASM", "Zone"], observed=False)["This Month"].sum().reset_index()
+            top_outlets = top_outlets.sort_values(by="This Month", ascending=False).head(10)
+            st.dataframe(top_outlets, use_container_width=True)
+
+    elif query_type == "Outlets with Zero Volume (This Month)":
+        st.markdown("#### Outlets with 0 Total Volume This Month:")
+        outlet_sums = filtered_df.groupby(["LIC No", "Outlet Name", "ASM"], observed=False)["This Month"].sum().reset_index()
+        zero_vol = outlet_sums[outlet_sums["This Month"] == 0]
+        st.dataframe(zero_vol, use_container_width=True)
+
+    elif query_type == "Brands with negative growth compared to Last Month":
+        st.markdown("#### Brands experiencing a drop from Last Month to This Month:")
+        brand_comp = filtered_df.groupby("Brand", observed=False)[["Last Month", "This Month"]].sum().reset_index()
+        brand_comp["Difference"] = brand_comp["This Month"] - brand_comp["Last Month"]
+        negative_brands = brand_comp[brand_comp["Difference"] < 0].sort_values(by="Difference")
+        st.dataframe(negative_brands, use_container_width=True)
