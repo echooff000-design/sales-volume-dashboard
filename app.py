@@ -10,7 +10,7 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & ADD STICKY COLUMN / TABLE / SIDEBAR CSS ---
+# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / BUTTON / TABLE CSS ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -67,7 +67,7 @@ hide_streamlit_style = """
                 background-color: #D9E1F2 !important;
             }
             
-            /* --- CLEAN THIN BORDER STYLING FOR ALL TABLES --- */
+            /* --- CLEAN THIN BORDER STYLING --- */
             .custom-dashboard-table {
                 border: 1px solid #d3d3d3 !important;
                 border-collapse: collapse !important;
@@ -301,6 +301,14 @@ st.markdown("""
     }
 
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #d3d3d3 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
+    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #b0b0b0 !important; font-size: 8px; white-space: nowrap !important; }
+    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
+    .brand-row { background-color: #FFFFFF; color: #000000; }
+    .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #000000; }
+    .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #000000; }
+    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 9px; border-top: 2px solid #b0b0b0 !important; white-space: nowrap !important; }
     </style>
 """, unsafe_allow_html=True)
 
