@@ -10,14 +10,12 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- ENABLE MOBILE ZOOM & HIDE STREAMLIT BRANDING / FIX CSS ---
+# --- ENABLE MOBILE 2-FINGER ZOOM & STYLING ---
 hide_streamlit_style = """
             <style>
-            /* --- ENABLE MOBILE 2-FINGER ZOOM --- */
-            @media screen and (max-width: 768px) {
-                html, body, [data-testid="stAppViewContainer"] {
-                    touch-action: pan-x pan-y pinch-zoom !important;
-                }
+            /* --- ENABLE TOUCH PINCH ZOOM ON MOBILE --- */
+            html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+                touch-action: auto !important;
             }
 
             #MainMenu {visibility: hidden;}
@@ -96,13 +94,18 @@ hide_streamlit_style = """
                 border-bottom: 2px solid #b0b0b0 !important;
             }
             </style>
-            
+
             <script>
-                // Ensure mobile viewport allows scaling and zooming
-                var meta = document.createElement('meta');
-                meta.name = 'viewport';
-                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
-                document.getElementsByTagName('head')[0].appendChild(meta);
+                // Force mobile browsers to allow user scaling and zooming
+                var existingMeta = document.querySelector('meta[name="viewport"]');
+                if (existingMeta) {
+                    existingMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+                } else {
+                    var meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+                    document.getElementsByTagName('head')[0].appendChild(meta);
+                }
             </script>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -891,7 +894,7 @@ with main_tab4:
             top_outlets = top_outlets.sort_values(by="This Month", ascending=False).head(10)
             st.dataframe(top_outlets, use_container_width=True)
 
-    elif query_type == "Outlerin with Zero Volume (This Month)" or query_type == "Outlets with Zero Volume (This Month)":
+    elif query_type == "Outlets with Zero Volume (This Month)":
         st.markdown("#### Outlets with 0 Total Volume This Month:")
         outlet_sums = filtered_df.groupby(["LIC No", "Outlet Name", "ASM"], observed=False)["This Month"].sum().reset_index()
         zero_vol = outlet_sums[outlet_sums["This Month"] == 0]
