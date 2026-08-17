@@ -10,12 +10,14 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- ENABLE MOBILE 2-FINGER ZOOM & STYLING ---
+# --- MOBILE ZOOM & STYLING INJECTION ---
 hide_streamlit_style = """
             <style>
-            /* --- ENABLE TOUCH PINCH ZOOM ON MOBILE --- */
-            html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
-                touch-action: auto !important;
+            /* --- FORCE UNLOCKED ZOOM & SCROLLING ON MOBILE --- */
+            html, body, [data-testid="stAppViewContainer"], .main {
+                touch-action: manipulation !important;
+                -webkit-user-select: text !important;
+                user-select: text !important;
             }
 
             #MainMenu {visibility: hidden;}
@@ -96,16 +98,22 @@ hide_streamlit_style = """
             </style>
 
             <script>
-                // Force mobile browsers to allow user scaling and zooming
-                var existingMeta = document.querySelector('meta[name="viewport"]');
-                if (existingMeta) {
-                    existingMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
-                } else {
-                    var meta = document.createElement('meta');
-                    meta.name = 'viewport';
-                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
-                    document.getElementsByTagName('head')[0].appendChild(meta);
+                // Dynamically modify viewport meta tag to explicitly allow pinch-to-zoom
+                const metaTag = document.createElement('meta');
+                metaTag.name = 'viewport';
+                metaTag.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+                
+                // Replace existing viewport if present
+                const existing = document.querySelector('meta[name="viewport"]');
+                if (existing) {
+                    existing.remove();
                 }
+                document.head.appendChild(metaTag);
+
+                // Prevent touch-action suppression on mobile wrappers
+                document.addEventListener('gesturestart', function (e) {
+                    e.stopPropagation();
+                }, true);
             </script>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
