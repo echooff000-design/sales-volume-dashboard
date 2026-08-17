@@ -10,31 +10,27 @@ import extra_streamlit_components as stx
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- 2. DYNAMIC ZOOM & FONT SIZE STATE SETUP ---
-if "table_font_size" not in st.session_state:
-    st.session_state["table_font_size"] = 8.5  # Default font size in pixels
-
-# --- HIDE STREAMLIT BRANDING & INJECT DYNAMIC FONT ZOOM CSS ---
-hide_streamlit_style = f"""
+# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / BUTTON / TABLE CSS ---
+hide_streamlit_style = """
             <style>
-            #MainMenu {{visibility: hidden;}}
-            footer {{visibility: hidden;}}
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
             
             /* --- FORCE SIDEBAR TO STAY DARK & VISIBLE IN ALL MODES --- */
-            [data-testid="stSidebar"] {{
+            [data-testid="stSidebar"] {
                 background-color: #0f172a !important;
                 border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
             }
-            [data-testid="stSidebar"] * {{
+            [data-testid="stSidebar"] * {
                 color: #f8fafc !important;
             }
-            [data-testid="stSidebar"] a {{
+            [data-testid="stSidebar"] a {
                 color: #60a5fa !important;
-            }}
+            }
             
             /* --- FIX SIDEBAR BUTTONS & DOWNLOAD BUTTONS VISIBILITY IN LIGHT/NORMAL MODE --- */
             [data-testid="stSidebar"] .stButton button, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {{
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
                 background-color: #1e293b !important;
                 color: #ffffff !important;
                 border: 1px solid rgba(255, 255, 255, 0.25) !important;
@@ -44,12 +40,12 @@ hide_streamlit_style = f"""
             [data-testid="stSidebar"] .stButton button p, 
             [data-testid="stSidebar"] [data-testid="stDownloadButton"] button p,
             [data-testid="stSidebar"] .stButton button span, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button span {{
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button span {
                 color: #ffffff !important;
                 font-weight: 600 !important;
             }
             [data-testid="stSidebar"] .stButton button:hover, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {{
+            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
                 background-color: #334155 !important;
                 border-color: #3b82f6 !important;
                 color: #ffffff !important;
@@ -57,42 +53,46 @@ hide_streamlit_style = f"""
             
             /* --- FREEZE PANE STICKY COLUMN STYLING --- */
             .table-wrapper th:first-child,
-            .table-wrapper td:first-child {{
+            .table-wrapper td:first-child {
                 position: sticky !important;
                 left: 0 !important;
                 z-index: 2 !important;
                 background-color: #F2F2F2 !important;
                 border-right: 1px solid #d3d3d3 !important;
-            }}
-            .table-wrapper th:first-child {{
+            }
+            .table-wrapper th:first-child {
                 background-color: #D9E1F2 !important;
                 z-index: 3 !important;
             }
-            .custom-dashboard-table .brand-row td:first-child {{
+            .custom-dashboard-table .brand-row td:first-child {
                 background-color: #FFFFFF !important;
-            }}
-            .custom-dashboard-table .subtotal-row td:first-child {{
+            }
+            .custom-dashboard-table .subtotal-row td:first-child {
                 background-color: #F2F2F2 !important;
-            }}
-            .custom-dashboard-table .grand-total-row td:first-child {{
+            }
+            .custom-dashboard-table .grand-total-row td:first-child {
                 background-color: #D9E1F2 !important;
-            }}
+            }
             
-            /* --- DYNAMIC ZOOMABLE TABLE STYLING --- */
-            .table-wrapper {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }}
-            .custom-dashboard-table {{ width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: {st.session_state["table_font_size"]}px !important; border: 1px solid #d3d3d3 !important; }}
-            .custom-dashboard-table th, .custom-dashboard-table td {{ border: 1px solid #d3d3d3 !important; padding: 5px 4px !important; text-align: center; white-space: nowrap !important; font-size: {st.session_state["table_font_size"]}px !important; }}
-            .custom-dashboard-table th {{ background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #b0b0b0 !important; font-size: {max(7.0, st.session_state["table_font_size"] - 0.5)}px !important; white-space: nowrap !important; }}
-            .subtotal-row {{ font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: {st.session_state["table_font_size"]}px !important; }}
-            .brand-row {{ background-color: #FFFFFF; color: #000000; }}
-            .brand-col-text {{ text-align: left !important; padding-left: 4px !important; font-size: {st.session_state["table_font_size"]}px !important; white-space: nowrap !important; color: #000000; }}
-            .seg-col-text {{ text-align: left !important; line-height: 1.1; font-size: {st.session_state["table_font_size"]}px !important; white-space: nowrap !important; color: #000000; }}
-            .grand-total-row {{ background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: {st.session_state["table_font_size"] + 0.5}px !important; border-top: 2px solid #b0b0b0 !important; white-space: nowrap !important; }}
+            /* --- CLEAN THIN BORDER STYLING --- */
+            .custom-dashboard-table {
+                border: 1px solid #d3d3d3 !important;
+                border-collapse: collapse !important;
+                background-color: #ffffff !important;
+            }
+            .custom-dashboard-table th, .custom-dashboard-table td {
+                border: 1px solid #d3d3d3 !important;
+                padding: 4px 3px !important;
+            }
+            .custom-dashboard-table th {
+                background-color: #D9E1F2 !important;
+                border-bottom: 2px solid #b0b0b0 !important;
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- 3. AUTOMATIC LOG FILE FIXER (SELF-HEALING) ---
+# --- 2. AUTOMATIC LOG FILE FIXER (SELF-HEALING) ---
 csv_file = "login_logs.csv"
 if os.path.exists(csv_file):
     try:
@@ -130,13 +130,13 @@ if os.path.exists(csv_file):
     except Exception as e:
         pass
 
-# --- 4. COOKIE MANAGER SETUP ---
+# --- 3. COOKIE MANAGER SETUP ---
 def get_manager():
     return stx.CookieManager()
 
 cookie_manager = get_manager()
 
-# --- 5. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
+# --- 4. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINK) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 @st.cache_data(ttl=300)
@@ -168,7 +168,7 @@ if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
     st.stop()
 
-# --- 6. LOGIN CREDENTIAL SYSTEM ---
+# --- 5. LOGIN CREDENTIAL SYSTEM ---
 if "Users" not in dfs:
     st.error("❌ Could not find the 'Users' sheet in your Excel file. Please add it with columns: Name, user_id, password.")
     st.stop()
@@ -306,6 +306,16 @@ st.markdown("""
     .stTabs [data-baseweb="tab-highlight"] {
         background-color: #ef4444 !important;
     }
+
+    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; }
+    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #d3d3d3 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
+    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #b0b0b0 !important; font-size: 8px; white-space: nowrap !important; }
+    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
+    .brand-row { background-color: #FFFFFF; color: #000000; }
+    .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #000000; }
+    .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #000000; }
+    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 9px; border-top: 2px solid #b0b0b0 !important; white-space: nowrap !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -336,21 +346,6 @@ if last_update:
 if st.sidebar.button("🔄 Refresh Data Now"):
     st.cache_data.clear()
     st.sidebar.success("Cache cleared! Fetching newest data...")
-
-# --- TABLE ZOOM / FONT SIZE CONTROLLER IN SIDEBAR ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("🔍 **Table View Zoom**")
-zoom_level = st.sidebar.slider(
-    "Adjust Table Text Size", 
-    min_value=7.0, 
-    max_value=16.0, 
-    value=float(st.session_state["table_font_size"]), 
-    step=0.5,
-    help="Increase this slider to zoom in on mobile/desktop tables."
-)
-if zoom_level != st.session_state["table_font_size"]:
-    st.session_state["table_font_size"] = zoom_level
-    st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
@@ -538,6 +533,25 @@ def sort_asms(asm_list):
     sorted_normal = sorted([a for a in valid_asms if a.strip().lower() != "key accounts"])
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
+
+# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER ---
+def render_zoomable_table(html_content):
+    # Add a clean zoom toolbar right above the table so mobile users can easily scale text/table size
+    zoom_key = f"zoom_{hash(html_content) % 10000}"
+    zoom_level = st.select_slider(
+        "🔍 Table Zoom Control (Mobile / Desktop)",
+        options=[100, 125, 150, 175, 200],
+        value=100,
+        format_func=lambda x: f"{x}%",
+        key=zoom_key
+    )
+    
+    wrapped_html = f"""
+    <div style="zoom: {zoom_level}%; -moz-transform: scale({zoom_level/100}); -moz-transform-origin: top left; overflow-x: auto;">
+        {html_content}
+    </div>
+    """
+    st.markdown(wrapped_html, unsafe_allow_html=True)
 
 # --- 9. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
 def generate_html_table(df, metric_type="Volume"):
@@ -820,11 +834,11 @@ main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs(["📦 Volume", "📈 Ms%",
 
 with main_tab1:
     html_vol = generate_html_table(filtered_df, metric_type="Volume")
-    st.write(html_vol, unsafe_allow_html=True)
+    render_zoomable_table(html_vol)
 
 with main_tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
-    st.write(html_ms, unsafe_allow_html=True)
+    render_zoomable_table(html_ms)
 
 with main_tab3:
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
@@ -832,17 +846,17 @@ with main_tab3:
     with sub_tab1:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
         html_h1 = generate_hierarchy_table_1(filtered_df)
-        st.write(html_h1, unsafe_allow_html=True)
+        render_zoomable_table(html_h1)
 
     with sub_tab2:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
-        st.write(html_h2, unsafe_allow_html=True)
+        render_zoomable_table(html_h2)
 
     with sub_tab3:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
-        st.write(html_h3, unsafe_allow_html=True)
+        render_zoomable_table(html_h3)
 
 with main_tab4:
     st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
