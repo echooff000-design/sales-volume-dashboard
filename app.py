@@ -19,12 +19,13 @@ hide_streamlit_style = """
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             
-            /* --- FORCE SIDEBAR TO STAY DARK & VISIBLE IN ALL MODES --- */
+            /* --- FORCE SIDEBAR TO STAY DARK & PRESERVE MATERIAL ICONS --- */
             [data-testid="stSidebar"] {
                 background-color: #0f172a !important;
                 border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+                font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
             }
-            [data-testid="stSidebar"] * {
+            [data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]):not(i):not(svg):not(span[class*="material"]):not(span[class*="icon"]) {
                 color: #f8fafc !important;
                 font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
             }
@@ -814,7 +815,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -831,7 +832,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
