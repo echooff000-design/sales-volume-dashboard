@@ -130,7 +130,7 @@ hide_streamlit_style = """
             }
             .seg-col-text { 
                 text-align: left !important; 
-                padding-left: 8px !important;
+                padding-left: 8px !important; 
                 line-height: 1.2 !important; 
                 font-size: 13.5px !important; 
                 white-space: nowrap !important; 
@@ -1150,13 +1150,13 @@ with main_tab4:
         unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(unbilled_df)
         
-        st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but Have NOT Billed **{target_brand_choice}** this Month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but Have NOT Billed **TIL Brands** this Month (Total: {out_cnt:,} Outlets):")
         
         if not unbilled_df.empty:
             st.dataframe(unbilled_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"til_non_billing_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
+            st.success("🎉 No unbilled outlets found for TIL Brands within the active filter scope!")
 
     elif "Deluxe Industry >=" in query_type or "Deluxe Industry >" in query_type:
         deluxe_vol = basis_combined[basis_combined["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
