@@ -124,9 +124,14 @@ def get_manager():
 
 cookie_manager = get_manager()
 
-# --- 4. DATA FETCHING (ONLINE SHAREPOINT DIRECT LINKS) ---
+# --- 4. DATA FETCHING (FROM STREAMLIT SECRETS) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
-RAW_HISTORICAL_URL = "https://tilaknagarindustries-my.sharepoint.com/:x:/g/personal/andebnath_tilind_com/IQDgm_kiCV5STbn_ziAyo8_pARvUsuNLyey3WIKNVlXXCSM?download=1"
+
+# Read 2nd Historical Excel link from st.secrets with safe fallback
+if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
+    RAW_HISTORICAL_URL = st.secrets["HISTORICAL_SHAREPOINT_URL"].split("?")[0] + "?download=1"
+else:
+    RAW_HISTORICAL_URL = "https://tilaknagarindustries-my.sharepoint.com/:x:/g/personal/andebnath_tilind_com/IQDgm_kiCV5STbn_ziAyo8_pARvUsuNLyey3WIKNVlXXCSM?download=1"
 
 @st.cache_data(ttl=300)
 def load_data_from_url(url):
