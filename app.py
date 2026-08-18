@@ -986,8 +986,8 @@ with main_tab4:
                 "-- Select a Query --",
                 # Gap / Opportunity Queries
                 "TIL Non Billed Outlets",
-                "Deluxe Industry > 30 CS but IBDC Not Billed",
-                "Semi Premium Whisky Industry > 50 CS but MHW Not Billed",
+                "Deluxe Industry >= 30 CS but IBDC Not Billed",
+                "Semi Premium Whisky Industry >= 50 CS but MHW Not Billed",
                 "Magic Moments Billed but BLG Not Billed",
                 "MCD Lux Billed but IBDC Not Billed",
                 "IQ Billed but IBDC Not Billed",
@@ -1124,9 +1124,9 @@ with main_tab4:
         else:
             st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
 
-    elif "Deluxe Industry > 30 CS" in query_type:
+    elif "Deluxe Industry >=" in query_type or "Deluxe Industry >" in query_type:
         deluxe_vol = basis_combined[basis_combined["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
-        deluxe_30_lics = deluxe_vol[deluxe_vol > 30].index.tolist()
+        deluxe_30_lics = deluxe_vol[deluxe_vol >= 30].index.tolist()
         ibdc_billed = f_this[(f_this["Brand"] == "IBDC") & (f_this["Value"] > 0)]["LIC No"].unique() if "Brand" in f_this.columns else []
         
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
@@ -1135,7 +1135,7 @@ with main_tab4:
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
-        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume >= 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
@@ -1143,9 +1143,9 @@ with main_tab4:
         else:
             st.success("🎉 No gap outlets found!")
 
-    elif "Semi Premium Whisky Industry > 50 CS" in query_type:
+    elif "Semi Premium Whisky Industry >=" in query_type or "Semi Premium Whisky Industry >" in query_type:
         sp_vol = basis_combined[basis_combined["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
-        sp_50_lics = sp_vol[sp_vol > 50].index.tolist()
+        sp_50_lics = sp_vol[sp_vol >= 50].index.tolist()
         mhw_billed = f_this[(f_this["Brand"] == "MHW") & (f_this["Value"] > 0)]["LIC No"].unique() if "Brand" in f_this.columns else []
         
         target_lics = set(sp_50_lics) - set(mhw_billed)
@@ -1154,7 +1154,7 @@ with main_tab4:
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
-        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume >= 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
