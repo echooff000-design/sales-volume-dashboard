@@ -5,6 +5,7 @@ import io
 import datetime
 import os
 import base64
+import re
 import extra_streamlit_components as stx
 import gspread
 from google.oauth2.service_account import Credentials
@@ -154,12 +155,9 @@ def load_data_from_url(url):
             except Exception:
                 dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
         
-        ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-        fetch_time = datetime.datetime.now(ist_timezone).strftime("%d %b %Y, %I:%M %p")
-        
-        return dfs, None, fetch_time
+        return dfs, None
     except Exception as e:
-        return None, str(e), None
+        return None, str(e)
 
 @st.cache_data(ttl=600)
 def load_historical_data_from_url(url):
@@ -180,39 +178,54 @@ def load_historical_data_from_url(url):
         return None, str(e)
 
 with st.spinner("Connecting to database..."):
-    dfs, error, last_update = load_data_from_url(RAW_SHAREPOINT_URL)
+    dfs, error = load_data_from_url(RAW_SHAREPOINT_URL)
 
 if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
     st.stop()
 
-# --- 6. LOGIN CREDENTIAL SYSTEM ---
+# --- 6. LOGIN CREDENTIAL & EXACT F2 DATE EXTRACTOR ---
 if "Users" not in dfs:
     st.error("❌ Could not find the 'Users' sheet in your Excel file. Please add it with columns: Name, user_id, password.")
     st.stop()
 
 raw_users_df = dfs["Users"].copy()
 
-# Read F2 Date if available
+# Extract Date from F2 Cell
 days_elapsed = None
+f2_display_date = ""
+
 try:
-    if raw_users_df.shape[1] >= 6 and raw_users_df.shape[0] >= 1:
+    date_col = next((c for c in raw_users_df.columns if str(c).strip().lower() == 'date'), None)
+    f2_val = None
+    if date_col is not None and len(raw_users_df) > 0:
+        f2_val = raw_users_df[date_col].iloc[0]
+    elif raw_users_df.shape[1] >= 6 and len(raw_users_df) > 0:
         f2_val = raw_users_df.iloc[0, 5]
-        if pd.notna(f2_val):
-            if isinstance(f2_val, (datetime.datetime, datetime.date, pd.Timestamp)):
-                days_elapsed = f2_val.day
+
+    if pd.notna(f2_val) and str(f2_val).strip() != "":
+        raw_val_str = str(f2_val).strip()
+        if isinstance(f2_val, (datetime.datetime, datetime.date, pd.Timestamp)):
+            days_elapsed = int(f2_val.day)
+            f2_display_date = f2_val.strftime("%d %b %Y")
+        else:
+            parsed_d = pd.to_datetime(raw_val_str, errors='coerce', dayfirst=True)
+            if pd.notna(parsed_d):
+                days_elapsed = int(parsed_d.day)
+                f2_display_date = parsed_d.strftime("%d %b %Y")
             else:
-                parsed_d = pd.to_datetime(str(f2_val).strip(), errors='coerce')
-                if pd.notna(parsed_d):
-                    days_elapsed = parsed_d.day
-                else:
-                    days_elapsed = int(str(f2_val).split('-')[0].strip())
+                f2_display_date = raw_val_str
+                match = re.search(r'\b(\d{1,2})\b', raw_val_str)
+                if match:
+                    days_elapsed = int(match.group(1))
 except Exception:
     pass
 
 if not days_elapsed:
     ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    days_elapsed = datetime.datetime.now(ist_tz).day
+    now_dt = datetime.datetime.now(ist_tz)
+    days_elapsed = now_dt.day
+    f2_display_date = now_dt.strftime("%d %b %Y")
 
 df_users = raw_users_df.copy()
 df_users.columns = df_users.columns.astype(str).str.strip().str.lower()
@@ -399,9 +412,9 @@ with col_logout:
         st.session_state["is_admin"] = False
         st.rerun()
 
+# --- SIDEBAR WITH DYNAMIC USER F2 DATE ---
 st.sidebar.markdown("📁 **Data Source**")
-if last_update:
-    st.sidebar.caption(f"🕒 **Last Synced:** {last_update}")
+st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
 
 if st.sidebar.button("🔄 Refresh Data Now"):
     st.cache_data.clear()
@@ -1193,7 +1206,8 @@ with main_tab4:
             st.success(f"🎉 No lapsed outlets found for {brand_name_str} under the active criteria!")
 
     elif "Brand-wise L3M Daily Run vs Current Month Daily Run" in query_type:
-        st.markdown(f"#### 📊 Brand-wise L3M Daily Run vs Current Month Daily Run (Based on Day {days_elapsed}):")
+        st.markdown(f"#### 📊 Brand-wise L3M Daily Run (L3M Vol / 90) vs TM Daily Run (TM Vol / {days_elapsed} Days):")
+        st.caption(f"ℹ️ *Current calculation basis: **{f2_display_date}** (Elapsed Days: **{days_elapsed}** from 'Users' Sheet Cell F2)*")
         
         # Calculate L3M Volume (LM + M2 + M3)
         l3m_dfs = [f_last]
@@ -1216,8 +1230,10 @@ with main_tab4:
             
             rr_data.append({
                 "Brand": b,
-                "L3M Daily Run": l3m_daily,
-                "TM Daily Run": tm_daily,
+                "L3M Total Vol": int(l3m_v),
+                "L3M Daily Run (/90)": l3m_daily,
+                "TM Total Vol": int(tm_v),
+                f"TM Daily Run (/{days_elapsed} Days)": tm_daily,
                 "Growth (CS)": growth_cs,
                 "Growth %": f"{growth_pct:+.1f}%"
             })
