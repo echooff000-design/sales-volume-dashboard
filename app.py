@@ -124,7 +124,14 @@ def get_manager():
 
 cookie_manager = get_manager()
 
-# --- 4. DATA FETCHING (FROM STREAMLIT SECRETS) ---
+# --- 4. EXCEL EXPORT HELPER FUNCTION ---
+def to_excel_bytes(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    return output.getvalue()
+
+# --- 5. DATA FETCHING (FROM STREAMLIT SECRETS) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
@@ -179,7 +186,7 @@ if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
     st.stop()
 
-# --- 5. LOGIN CREDENTIAL SYSTEM ---
+# --- 6. LOGIN CREDENTIAL SYSTEM ---
 if "Users" not in dfs:
     st.error("❌ Could not find the 'Users' sheet in your Excel file. Please add it with columns: Name, user_id, password.")
     st.stop()
@@ -431,7 +438,7 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to FTS Calculator](https://wbftscalculator.streamlit.app/)**")
 
-# --- 6. FETCH DATA FROM SHEETS ---
+# --- 7. FETCH DATA FROM SHEETS ---
 required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
 for sheet in required_sheets:
     if sheet not in dfs:
@@ -517,7 +524,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
 
-# --- 7. EXACT ORDER MAPPING & DATA CONVERSION ---
+# --- 8. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
 for col in num_cols:
     if col not in df_raw.columns:
@@ -557,7 +564,7 @@ df_raw[brand_col] = pd.Categorical(df_raw[brand_col], categories=final_brand_ord
 
 master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_values(by=[seg_col, brand_col])
 
-# --- 8. CASCADING SIDEBAR FILTERS ---
+# --- 9. CASCADING SIDEBAR FILTERS ---
 st.markdown("<h3 style='color: #f8fafc; font-size: 20px;'>🔍 Filters</h3>", unsafe_allow_html=True)
 col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -629,7 +636,7 @@ def render_zoomable_table(html_content):
     """
     st.markdown(wrapped_html, unsafe_allow_html=True)
 
-# --- 9. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
+# --- 10. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -698,7 +705,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# --- 10. UPDATED HIERARCHY REPORT GENERATORS ---
+# --- 11. HIERARCHY REPORT GENERATORS ---
 def get_segment_for_brand(b_name):
     if b_name == "MHW":
         return ["Semi Premium-Whisky"]
@@ -902,7 +909,7 @@ def generate_hierarchy_table_3(df):
     html += '</tbody></table></div>'
     return html
 
-# --- 11. DISPLAY MAIN TABS ---
+# --- 12. DISPLAY MAIN TABS ---
 st.markdown("---")
 
 main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Dashboard", "💬 Ask Assistant"])
@@ -1050,7 +1057,6 @@ with main_tab4:
 
     # --- QUERY EXECUTION LOGIC ---
     if query_type == "Not Billed Outlet":
-        st.markdown(f"#### 🔍 Outlets that have not billed **{target_brand_choice}** this month:")
         target_brands = brand_family_map.get(target_brand_choice, [target_brand_choice])
         
         # Outlets billed in selected basis period
@@ -1065,10 +1071,13 @@ with main_tab4:
         this_billed_target = f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))]
+        out_cnt = len(unbilled_df)
+        
+        st.markdown(f"#### 🔍 Outlets that have not billed **{target_brand_choice}** this month (Total: {out_cnt:,} Outlets):")
         
         if not unbilled_df.empty:
             st.dataframe(unbilled_df, use_container_width=True)
-            st.download_button("📥 Download Unbilled Outlets CSV", data=unbilled_df.to_csv(index=False).encode('utf-8'), file_name=f"unbilled_{target_brand_choice}.csv", mime="text/csv")
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"unbilled_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
 
@@ -1092,22 +1101,22 @@ with main_tab4:
         else:
             driver_b, target_b = [], []
 
-        st.markdown(f"#### 🔍 Outlets Billing **{'/'.join(driver_b)}** but NOT Billing **{'/'.join(target_b)}** this month:")
-        
         driver_outlets = f_this[(f_this["Brand"].isin(driver_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         target_outlets = f_this[(f_this["Brand"].isin(target_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
         gap_lics = set(driver_outlets) - set(target_outlets)
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)]
+        out_cnt = len(gap_df)
+        
+        st.markdown(f"#### 🔍 Outlets Billing **{'/'.join(driver_b)}** but NOT Billing **{'/'.join(target_b)}** this month (Total: {out_cnt:,} Outlets):")
         
         if not gap_df.empty:
             st.dataframe(gap_df, use_container_width=True)
-            st.download_button("📥 Download Gap Outlets CSV", data=gap_df.to_csv(index=False).encode('utf-8'), file_name="brand_gap_outlets.csv", mime="text/csv")
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(gap_df), file_name="brand_gap_outlets.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
 
     elif "Deluxe & Deluxe Plus Industry > 30 cs" in query_type:
-        st.markdown("#### 🔍 Outlets with Deluxe Industry Volume > 30 cases but IBDC NOT Billed (This Month):")
         deluxe_vol = f_this[f_this["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
         deluxe_30_lics = deluxe_vol[deluxe_vol > 30].index.tolist()
         ibdc_billed = f_this[(f_this["Brand"] == "IBDC") & (f_this["Value"] > 0)]["LIC No"].unique()
@@ -1115,15 +1124,17 @@ with main_tab4:
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
         res_df["Deluxe Industry Vol"] = res_df["LIC No"].map(deluxe_vol)
+        out_cnt = len(res_df)
+        
+        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 cases but IBDC NOT Billed This Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True)
-            st.download_button("📥 Download Deluxe > 30cs Gap CSV", data=res_df.to_csv(index=False).encode('utf-8'), file_name="deluxe_30cs_ibdc_unbilled.csv", mime="text/csv")
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="deluxe_30cs_ibdc_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No outlets found matching this condition!")
 
     elif "Semi Premium Whisky Industry > 50 cs" in query_type:
-        st.markdown("#### 🔍 Outlets with Semi Premium Whisky Volume > 50 cases but MHW NOT Billed (This Month):")
         sp_vol = f_this[f_this["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
         sp_50_lics = sp_vol[sp_vol > 50].index.tolist()
         mhw_billed = f_this[(f_this["Brand"] == "MHW") & (f_this["Value"] > 0)]["LIC No"].unique()
@@ -1131,17 +1142,19 @@ with main_tab4:
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
         res_df["Semi Premium Vol"] = res_df["LIC No"].map(sp_vol)
+        out_cnt = len(res_df)
+        
+        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 cases but MHW NOT Billed This Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True)
-            st.download_button("📥 Download Semi Premium > 50cs Gap CSV", data=res_df.to_csv(index=False).encode('utf-8'), file_name="sp_50cs_mhw_unbilled.csv", mime="text/csv")
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="sp_50cs_mhw_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No outlets found matching this condition!")
 
     elif "Not Repeated Outlet List" in query_type:
         target_brands = ["SMG", "SMGP"] if "SMG" in query_type else ["SIW"]
         brand_name_str = "SMG+SMGP" if "SMG" in query_type else "SIW"
-        st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}**:")
         
         # 1. Collect all outlets that have billed the brand ANY TIME historically (M0 to M4)
         all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4]
@@ -1161,16 +1174,19 @@ with main_tab4:
             if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
                 selected_period_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
                 
-        # Also check current month
+        # Current month billed
         tm_billed = set(f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].dropna().unique()) if not f_this.empty else set()
         
         # Lapsed = Ever billed historically BUT not billed in evaluated criteria / current month
         not_repeated = anytime_billed - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)]
+        out_cnt = len(res_df)
+        
+        st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}** (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True)
-            st.download_button(f"📥 Download {brand_name_str} Lapsed Outlets CSV", data=res_df.to_csv(index=False).encode('utf-8'), file_name=f"{brand_name_str}_not_repeated.csv", mime="text/csv")
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name=f"{brand_name_str}_not_repeated.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success(f"🎉 No lapsed / unrepeated outlets found for {brand_name_str} under the active criteria!")
 
@@ -1206,7 +1222,7 @@ with main_tab4:
             
         df_rr = pd.DataFrame(rr_data)
         st.dataframe(df_rr, use_container_width=True)
-        st.download_button("📥 Download Run-Rate CSV", data=df_rr.to_csv(index=False).encode('utf-8'), file_name="l3m_vs_tm_daily_run.csv", mime="text/csv")
+        st.download_button("📥 Download in Excel", data=to_excel_bytes(df_rr), file_name="l3m_vs_tm_daily_run.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     # --- 5-MONTH TREND TABLES ---
     elif "Trend (5 Months)" in query_type:
