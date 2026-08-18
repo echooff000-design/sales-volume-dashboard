@@ -26,6 +26,7 @@ hide_streamlit_style = """
             }
             [data-testid="stSidebar"] * {
                 color: #f8fafc !important;
+                font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
             }
             [data-testid="stSidebar"] a {
                 color: #60a5fa !important;
@@ -77,7 +78,7 @@ hide_streamlit_style = """
                 background-color: #D9E1F2 !important;
             }
             
-            /* --- CLEAN THIN BORDER STYLING & MOBILE TWO-FINGER ZOOM SUPPORT --- */
+            /* --- STANDARD CALIBRI FONT & CLEAN TABLE STYLING --- */
             .table-wrapper { 
                 width: 100%; 
                 overflow-x: auto; 
@@ -87,28 +88,61 @@ hide_streamlit_style = """
                 touch-action: pan-x pan-y pinch-zoom !important;
             }
             .custom-dashboard-table {
-                border: 1px solid #d3d3d3 !important;
+                width: 100%;
                 border-collapse: collapse !important;
+                font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
                 background-color: #ffffff !important;
+                color: #000000 !important;
+                font-size: 13.5px !important;
+                border: 1px solid #d3d3d3 !important;
                 touch-action: pan-x pan-y pinch-zoom !important;
             }
             .custom-dashboard-table th, .custom-dashboard-table td {
                 border: 1px solid #d3d3d3 !important;
-                padding: 4px 3px !important;
+                padding: 6px 8px !important;
                 text-align: center; 
                 white-space: nowrap !important;
             }
             .custom-dashboard-table th {
                 background-color: #D9E1F2 !important;
                 border-bottom: 2px solid #b0b0b0 !important;
-                font-weight: bold;
-                font-size: 8px;
+                font-weight: 700 !important;
+                font-size: 13.5px !important;
             }
-            .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
-            .brand-row { background-color: #FFFFFF; color: #000000; }
-            .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #000000; }
-            .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #000000; }
-            .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 9px; border-top: 2px solid #b0b0b0 !important; white-space: nowrap !important; }
+            .subtotal-row { 
+                font-weight: bold !important; 
+                color: #000000 !important; 
+                background-color: #F2F2F2 !important; 
+                font-size: 13.5px !important; 
+            }
+            .brand-row { 
+                background-color: #FFFFFF !important; 
+                color: #000000 !important; 
+                font-size: 13px !important;
+            }
+            .brand-col-text { 
+                text-align: left !important; 
+                padding-left: 8px !important; 
+                font-size: 13px !important; 
+                white-space: nowrap !important; 
+                color: #000000 !important; 
+            }
+            .seg-col-text { 
+                text-align: left !important; 
+                padding-left: 8px !important;
+                line-height: 1.2 !important; 
+                font-size: 13.5px !important; 
+                white-space: nowrap !important; 
+                color: #000000 !important; 
+            }
+            .grand-total-row { 
+                background-color: #D9E1F2 !important; 
+                color: #000000 !important; 
+                font-weight: bold !important; 
+                font-size: 14px !important; 
+                border-top: 2px solid #b0b0b0 !important; 
+                white-space: nowrap !important; 
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -288,7 +322,7 @@ if "authenticated" not in st.session_state:
 if not st.session_state["authenticated"]:
     st.markdown("""
         <style>
-        .stApp { background-color: #0f172a !important; }
+        .stApp { background-color: #0f172a !important; font-family: Calibri, 'Segoe UI', Arial, sans-serif !important; }
         [data-testid="stForm"] { background: rgba(30, 41, 59, 0.7) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
         
         .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
@@ -368,15 +402,16 @@ if not st.session_state["authenticated"]:
 # --- MAIN DASHBOARD STYLING ---
 st.markdown("""
     <style>
-    .stApp { background-color: #0f172a !important; }
+    .stApp { background-color: #0f172a !important; font-family: Calibri, 'Segoe UI', Arial, sans-serif !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
-    [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #f8fafc !important; font-weight: 600 !important; }
+    [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #f8fafc !important; font-weight: 600 !important; font-size: 13px !important; }
     
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
     .stTabs [data-baseweb="tab"] p {
         color: #ef4444 !important;
         font-weight: 600 !important;
+        font-size: 14px !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
     .stTabs [data-baseweb="tab"][aria-selected="true"] span,
@@ -398,10 +433,10 @@ with col_logo:
     except Exception:
         st.warning("logo.png missing")
 with col_title:
-    st.markdown("<h3 style='margin-top: 10px; font-size: 22px; color: #f8fafc;'>WB Sale Data</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-top: 10px; font-size: 22px; color: #f8fafc; font-family: Calibri, sans-serif;'>WB Sale Data</h3>", unsafe_allow_html=True)
 with col_logout:
     role_display = "Admin" if st.session_state.get("is_admin", False) else "User"
-    st.markdown(f"<p style='text-align: right; margin-top: 10px; font-size: 13px; color: #f8fafc;'>👤 <b>{st.session_state['user_name']}</b><br><span style='color: #60a5fa; font-size: 11px;'>{role_display}</span></p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: right; margin-top: 10px; font-size: 13px; color: #f8fafc; font-family: Calibri, sans-serif;'>👤 <b>{st.session_state['user_name']}</b><br><span style='color: #60a5fa; font-size: 11px;'>{role_display}</span></p>", unsafe_allow_html=True)
     if st.button("Logout"):
         try:
             cookie_manager.delete("wb_sale_user")
@@ -578,7 +613,7 @@ df_raw[brand_col] = pd.Categorical(df_raw[brand_col], categories=final_brand_ord
 master_brands = df_raw[[seg_col, brand_col]].drop_duplicates().dropna().sort_values(by=[seg_col, brand_col])
 
 # --- 9. CASCADING SIDEBAR FILTERS ---
-st.markdown("<h3 style='color: #f8fafc; font-size: 20px;'>🔍 Filters</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color: #f8fafc; font-size: 20px; font-family: Calibri, sans-serif;'>🔍 Filters</h3>", unsafe_allow_html=True)
 col1, col2, col3, col4, col5 = st.columns(5)
 
 temp_df = df_raw.copy()
@@ -779,7 +814,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -796,7 +831,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -939,23 +974,23 @@ with main_tab3:
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
     
     with sub_tab1:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
         html_h1 = generate_hierarchy_table_1(filtered_df)
         render_zoomable_table(html_h1)
 
     with sub_tab2:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
         render_zoomable_table(html_h2)
 
     with sub_tab3:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
         render_zoomable_table(html_h3)
 
 with main_tab4:
-    st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Perform advanced unbilled outlet queries, substitution gap analysis, run-rate comparisons, and multi-month brand trends.</p>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94a3b8; font-size: 13.5px; font-family: Calibri, sans-serif;'>Perform advanced unbilled outlet queries, substitution gap analysis, run-rate comparisons, and multi-month brand trends.</p>", unsafe_allow_html=True)
 
     # 1. Ask Assistant Controls
     col_q1, col_q2, col_q3 = st.columns([1.2, 1, 1.8])
@@ -1104,14 +1139,12 @@ with main_tab4:
     if query_type == "TIL Non Billed Outlets":
         target_brands = brand_family_map.get(target_brand_choice, [target_brand_choice])
         
-        # Calculate total basis volume for each outlet
         basis_vol_map = basis_combined.groupby("LIC No")["Value"].sum().to_dict() if "LIC No" in basis_combined.columns else {}
         basis_billed = [k for k, v in basis_vol_map.items() if v > 0]
         this_billed_target = f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))].copy()
         
-        # Add Volume Column, sort A-Z by Outlet Name
         unbilled_df[f"Total Vol ({basis_period}) [CS]"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
         unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(unbilled_df)
@@ -1216,7 +1249,6 @@ with main_tab4:
         all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4, f_m5]
         all_time_combined = pd.concat([d for d in all_time_dfs if not d.empty], ignore_index=True)
         
-        # Calculate historical volume billed for target brand
         target_hist_vol = all_time_combined[all_time_combined["Brand"].isin(target_brands)].groupby("LIC No")["Value"].sum()
         anytime_billed = target_hist_vol[target_hist_vol > 0].index.tolist()
         
