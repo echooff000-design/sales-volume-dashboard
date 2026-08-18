@@ -103,21 +103,18 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- 2. GOOGLE SHEETS CLIENT HELPER ---
-def get_gspread_client():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+# --- 2. GOOGLE SHEETS HELPER ---
+SHEET_ID = "1iEBhkOnErBiWiXgl74dYV3fYxLJvCKnff8ptkxHZ8eo"
+
+def get_sheet():
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    return gspread.authorize(creds)
-
-def open_log_sheet(client):
-    # Try opening by Sheet ID first (from URL), fallback to title
-    sheet_id = "1iEBhkOnErBiWiXgl74dYV3fYxLJvCKnff8ptkxHZ8eo"
-    try:
-        spreadsheet = client.open_by_key(sheet_id)
-    except Exception:
-        spreadsheet = client.open("WB Login Logs")
-    return spreadsheet.get_worksheet(0)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SHEET_ID).sheet1
 
 # --- 3. COOKIE MANAGER SETUP ---
 def get_manager():
@@ -272,12 +269,9 @@ if not st.session_state["authenticated"]:
                     
                     # --- GOOGLE SHEETS BACKGROUND LOGGER ---
                     try:
-                        client = get_gspread_client()
-                        sheet = open_log_sheet(client)
-                        
+                        sheet = get_sheet()
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         now = datetime.datetime.now(ist_timezone)
-                        
                         sheet.append_row([
                             str(now.year),
                             now.strftime("%Y-%m-%d"),
@@ -286,7 +280,7 @@ if not st.session_state["authenticated"]:
                             str(input_user)
                         ])
                     except Exception as e:
-                        st.error(f"⚠️ Google Sheets Log Write Error: {e}")
+                        st.error(f"⚠️ Google Sheets Write Error: {e}")
                         st.stop()
                     
                     st.rerun()
@@ -365,22 +359,22 @@ st.sidebar.markdown("📋 **Admin Panel**")
 # --- CONDITIONAL ADMIN LOG DOWNLOAD ---
 if st.session_state.get("is_admin", False):
     try:
-        client = get_gspread_client()
-        sheet = open_log_sheet(client)
+        sheet = get_sheet()
+        all_rows = sheet.get_all_values()
         
-        all_values = sheet.get_all_values()
-        if len(all_values) > 1:
-            data = sheet.get_all_records()
-            df_logs = pd.DataFrame(data)
+        if len(all_rows) > 1:
+            headers = all_rows[0]
+            rows = all_rows[1:]
+            df_logs = pd.DataFrame(rows, columns=headers)
             csv_logs = df_logs.to_csv(index=False).encode('utf-8')
             st.sidebar.download_button(
                 label="📥 Download Google Sheet Logs",
                 data=csv_logs,
-                file_name="google_sheets_login_logs.csv",
+                file_name="wb_login_logs.csv",
                 mime="text/csv"
             )
         else:
-            st.sidebar.info("ℹ️ Log sheet is connected. No logs recorded yet.")
+            st.sidebar.info("ℹ️ Google Sheet connected. No logins recorded yet.")
     except Exception as e:
         st.sidebar.error(f"⚠️ Could not fetch logs: {e}")
 else:
@@ -558,7 +552,7 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- HELPER FUNCTION TO SORT ASMS (PUSHING "Key Accounts" TO BOTTOM) ---
+# --- HELPER FUNCTION TO SORT ASMS ---
 def sort_asms(asm_list):
     valid_asms = [str(a) for a in asm_list if str(a).lower() not in ["nan", "none", ""]]
     sorted_normal = sorted([a for a in valid_asms if a.strip().lower() != "key accounts"])
