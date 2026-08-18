@@ -101,7 +101,14 @@ hide_streamlit_style = """
             .custom-dashboard-table th {
                 background-color: #D9E1F2 !important;
                 border-bottom: 2px solid #b0b0b0 !important;
+                font-weight: bold;
+                font-size: 8px;
             }
+            .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
+            .brand-row { background-color: #FFFFFF; color: #000000; }
+            .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #000000; }
+            .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #000000; }
+            .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 9px; border-top: 2px solid #b0b0b0 !important; white-space: nowrap !important; }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -380,16 +387,6 @@ st.markdown("""
     .stTabs [data-baseweb="tab-highlight"] {
         background-color: #ef4444 !important;
     }
-
-    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; }
-    .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #d3d3d3 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
-    .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #b0b0b0 !important; font-size: 8px; white-space: nowrap !important; }
-    .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
-    .brand-row { background-color: #FFFFFF; color: #000000; }
-    .brand-col-text { text-align: left !important; padding-left: 4px !important; font-size: 8px; white-space: nowrap !important; color: #000000; }
-    .seg-col-text { text-align: left !important; line-height: 1.1; font-size: 8px; white-space: nowrap !important; color: #000000; }
-    .grand-total-row { background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 9px; border-top: 2px solid #b0b0b0 !important; white-space: nowrap !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1047,7 +1044,7 @@ with main_tab4:
         "Monarch": ["Monarch"]
     }
 
-    # Filter historical sets based on current scope (including Multiselect Search)
+    # Filter sets based on active filter cascade & search multiselect
     def apply_active_filters(df_in):
         if df_in.empty: return df_in
         res = df_in.copy()
@@ -1107,16 +1104,22 @@ with main_tab4:
     if query_type == "TIL Non Billed Outlets":
         target_brands = brand_family_map.get(target_brand_choice, [target_brand_choice])
         
-        basis_billed = basis_combined[basis_combined["Value"] > 0]["LIC No"].unique() if "LIC No" in basis_combined.columns else []
+        # Calculate total basis volume for each outlet
+        basis_vol_map = basis_combined.groupby("LIC No")["Value"].sum().to_dict() if "LIC No" in basis_combined.columns else {}
+        basis_billed = [k for k, v in basis_vol_map.items() if v > 0]
         this_billed_target = f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
-        unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))]
+        unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))].copy()
+        
+        # Add Volume Column, sort A-Z by Outlet Name
+        unbilled_df[f"Total Vol ({basis_period}) [CS]"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
+        unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(unbilled_df)
         
         st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but Have NOT Billed **{target_brand_choice}** this Month (Total: {out_cnt:,} Outlets):")
         
         if not unbilled_df.empty:
-            st.dataframe(unbilled_df, use_container_width=True)
+            st.dataframe(unbilled_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"til_non_billing_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
@@ -1128,13 +1131,14 @@ with main_tab4:
         
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df[f"Deluxe Vol ({basis_period})"] = res_df["LIC No"].map(deluxe_vol)
+        res_df[f"Deluxe Industry Vol ({basis_period}) [CS]"] = res_df["LIC No"].map(deluxe_vol).fillna(0).astype(int)
+        res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
         st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True)
+            st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="deluxe_30cs_ibdc_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
@@ -1146,13 +1150,14 @@ with main_tab4:
         
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df[f"Semi Premium Vol ({basis_period})"] = res_df["LIC No"].map(sp_vol)
+        res_df[f"Semi Premium Vol ({basis_period}) [CS]"] = res_df["LIC No"].map(sp_vol).fillna(0).astype(int)
+        res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
         st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True)
+            st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="sp_50cs_mhw_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
@@ -1186,17 +1191,20 @@ with main_tab4:
             driver_b, target_b = [], []
             display_driver, display_target = "", ""
 
-        driver_outlets = basis_combined[(basis_combined["Brand"].isin(driver_b)) & (basis_combined["Value"] > 0)]["LIC No"].unique() if "LIC No" in basis_combined.columns else []
+        driver_vol_series = basis_combined[basis_combined["Brand"].isin(driver_b)].groupby("LIC No")["Value"].sum()
+        driver_outlets = driver_vol_series[driver_vol_series > 0].index.tolist()
         target_outlets = f_this[(f_this["Brand"].isin(target_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
         gap_lics = set(driver_outlets) - set(target_outlets)
-        gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)]
+        gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)].copy()
+        gap_df[f"{display_driver} Vol ({basis_period}) [CS]"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).astype(int)
+        gap_df = gap_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(gap_df)
         
         st.markdown(f"#### 🔍 Outlets Billing **{display_driver}** in **{basis_period}** but NOT Billing **{display_target}** this Month (Total: {out_cnt:,} Outlets):")
         
         if not gap_df.empty:
-            st.dataframe(gap_df, use_container_width=True)
+            st.dataframe(gap_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(gap_df), file_name="brand_gap_outlets.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
@@ -1205,31 +1213,26 @@ with main_tab4:
         target_brands = ["SMG", "SMGP"] if "SMG" in query_type else ["SIW"]
         brand_name_str = "SMG + SMGP" if "SMG" in query_type else "SIW"
         
-        # 1. Collect all outlets that have billed the brand ANY TIME historically (TM, LM, M2, M3, M4, M5)
         all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4, f_m5]
-        anytime_billed = set()
-        for d in all_time_dfs:
-            if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
-                anytime_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
+        all_time_combined = pd.concat([d for d in all_time_dfs if not d.empty], ignore_index=True)
         
-        # 2. Collect outlets that billed the brand in the selected basis period
-        selected_period_billed = set()
-        for d in basis_dfs:
-            if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
-                selected_period_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
-                
-        # Current month billed
+        # Calculate historical volume billed for target brand
+        target_hist_vol = all_time_combined[all_time_combined["Brand"].isin(target_brands)].groupby("LIC No")["Value"].sum()
+        anytime_billed = target_hist_vol[target_hist_vol > 0].index.tolist()
+        
+        selected_period_billed = set(basis_combined[(basis_combined["Brand"].isin(target_brands)) & (basis_combined["Value"] > 0)]["LIC No"].dropna().unique()) if not basis_combined.empty else set()
         tm_billed = set(f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].dropna().unique()) if not f_this.empty else set()
         
-        # Lapsed = Ever billed historically BUT not billed in evaluated basis criteria / current month
-        not_repeated = anytime_billed - (selected_period_billed.union(tm_billed))
-        res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)]
+        not_repeated = set(anytime_billed) - (selected_period_billed.union(tm_billed))
+        res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)].copy()
+        res_df[f"Historical {brand_name_str} Vol [CS]"] = res_df["LIC No"].map(target_hist_vol).fillna(0).astype(int)
+        res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
         st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}** (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True)
+            st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name=f"{brand_name_str}_lapsed.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success(f"🎉 No lapsed outlets found for {brand_name_str} under the active criteria!")
