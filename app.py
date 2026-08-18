@@ -956,7 +956,7 @@ with main_tab3:
 
 with main_tab4:
     st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Perform advanced unbilled outlet queries, substitution gap analysis, run-rate comparisons, and 5-month brand trends.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Perform advanced unbilled outlet queries, substitution gap analysis, run-rate comparisons, and multi-month brand trends.</p>", unsafe_allow_html=True)
 
     # 1. Ask Assistant Controls
     col_q1, col_q2, col_q3 = st.columns([1.2, 1, 1.8])
@@ -969,7 +969,8 @@ with main_tab4:
                 "Last Month (LM)",
                 "Last 2 Months (LM + M2)",
                 "Last 3 Months (LM + M2 + M3)",
-                "Last 4 Months (LM + M2 + M3 + M4)"
+                "Last 4 Months (LM + M2 + M3 + M4)",
+                "Last 5 Months (LM + M2 + M3 + M4 + M5)"
             ]
         )
         
@@ -986,11 +987,11 @@ with main_tab4:
                 "-- Select a Query --",
                 # Gap / Opportunity Queries
                 "TIL Non Billed Outlets",
+                "Deluxe Industry > 30 CS but IBDC Not Billed",
+                "Semi Premium Whisky Industry > 50 CS but MHW Not Billed",
                 "Magic Moments Billed but BLG Not Billed",
                 "MCD Lux Billed but IBDC Not Billed",
                 "IQ Billed but IBDC Not Billed",
-                "Deluxe Industry > 30 CS but IBDC Not Billed",
-                "Semi Premium Whisky Industry > 50 CS but MHW Not Billed",
                 "RSW Billed but MHW Not Billed",
                 "RGW Billed but MHW Not Billed",
                 "SRB7 Billed but MHW Not Billed",
@@ -1000,27 +1001,25 @@ with main_tab4:
                 "SIW Lapsed Outlets (Not Repeated)",
                 # Run-rate & Trends
                 "Brand-wise L3M Daily Run vs Current Month Daily Run",
-                "Deluxe Industry - MS% Trend (5 Months)",
-                "Semi Premium Whisky Industry - MS% Trend (5 Months)",
-                "Deluxe Industry - Volume Trend (5 Months)",
-                "Semi Premium Whisky Industry - Volume Trend (5 Months)",
-                "Deluxe Industry - Unique Billed Outlets Trend (5 Months)",
-                "Semi Premium Whisky Industry - Unique Billed Outlets Trend (5 Months)"
+                "Deluxe Industry - MS% Trend (6 Months)",
+                "Semi Premium Whisky Industry - MS% Trend (6 Months)",
+                "Deluxe Industry - Volume Trend (6 Months)",
+                "Semi Premium Whisky Industry - Volume Trend (6 Months)",
+                "Deluxe Industry - Unique Billed Outlets Trend (6 Months)",
+                "Semi Premium Whisky Industry - Unique Billed Outlets Trend (6 Months)"
             ]
         )
 
     # Lazy-load historical dataset if historical months are needed
-    needs_history = any(x in query_type for x in ["Trend", "L3M", "Lapsed", "Billed", "Industry"]) or "2" in basis_period or "3" in basis_period or "4" in basis_period
+    needs_history = any(x in query_type for x in ["Trend", "L3M", "Lapsed", "Billed", "Industry"]) or any(k in basis_period for k in ["2", "3", "4", "5"])
     
-    df_m2 = pd.DataFrame()
-    df_m3 = pd.DataFrame()
-    df_m4 = pd.DataFrame()
+    df_m2, df_m3, df_m4, df_m5 = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     if needs_history:
-        with st.spinner("Fetching 5-month historical data (M2, M3, M4)..."):
+        with st.spinner("Fetching historical data (M2, M3, M4, M5)..."):
             hist_dfs, hist_err = load_historical_data_from_url(RAW_HISTORICAL_URL)
             if hist_err or not hist_dfs:
-                st.warning(f"⚠️ Note: Could not load historical Excel (M2-M4): {hist_err}. Analysis will run on available data.")
+                st.warning(f"⚠️ Note: Could not load historical Excel (M2-M5): {hist_err}. Analysis will run on available data.")
             else:
                 if "M2" in hist_dfs:
                     df_m2 = standardize_df(hist_dfs["M2"])
@@ -1031,6 +1030,9 @@ with main_tab4:
                 if "M4" in hist_dfs:
                     df_m4 = standardize_df(hist_dfs["M4"])
                     df_m4["Metric"] = "M4"
+                if "M5" in hist_dfs:
+                    df_m5 = standardize_df(hist_dfs["M5"])
+                    df_m5["Metric"] = "M5"
 
     # Define helper brand lists
     brand_family_map = {
@@ -1064,6 +1066,7 @@ with main_tab4:
     f_m2 = apply_active_filters(df_m2)
     f_m3 = apply_active_filters(df_m3)
     f_m4 = apply_active_filters(df_m4)
+    f_m5 = apply_active_filters(df_m5)
 
     # Compile the active basis dataset based on user dropdown selection
     if "This Month (TM)" in basis_period:
@@ -1074,6 +1077,8 @@ with main_tab4:
         basis_dfs = [f_last, f_m2, f_m3]
     elif "Last 4 Months" in basis_period:
         basis_dfs = [f_last, f_m2, f_m3, f_m4]
+    elif "Last 5 Months" in basis_period:
+        basis_dfs = [f_last, f_m2, f_m3, f_m4, f_m5]
     else:  # Last Month (LM)
         basis_dfs = [f_last]
     
@@ -1102,7 +1107,43 @@ with main_tab4:
         else:
             st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
 
-    elif "Billed but" in query_type or "Billed But" in query_type or "Billed" in query_type and "Not Billed" in query_type:
+    elif "Deluxe Industry > 30 CS" in query_type:
+        deluxe_vol = basis_combined[basis_combined["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
+        deluxe_30_lics = deluxe_vol[deluxe_vol > 30].index.tolist()
+        ibdc_billed = f_this[(f_this["Brand"] == "IBDC") & (f_this["Value"] > 0)]["LIC No"].unique() if "Brand" in f_this.columns else []
+        
+        target_lics = set(deluxe_30_lics) - set(ibdc_billed)
+        res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
+        res_df[f"Deluxe Vol ({basis_period})"] = res_df["LIC No"].map(deluxe_vol)
+        out_cnt = len(res_df)
+        
+        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
+        
+        if not res_df.empty:
+            st.dataframe(res_df, use_container_width=True)
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="deluxe_30cs_ibdc_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        else:
+            st.success("🎉 No gap outlets found!")
+
+    elif "Semi Premium Whisky Industry > 50 CS" in query_type:
+        sp_vol = basis_combined[basis_combined["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
+        sp_50_lics = sp_vol[sp_vol > 50].index.tolist()
+        mhw_billed = f_this[(f_this["Brand"] == "MHW") & (f_this["Value"] > 0)]["LIC No"].unique() if "Brand" in f_this.columns else []
+        
+        target_lics = set(sp_50_lics) - set(mhw_billed)
+        res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
+        res_df[f"Semi Premium Vol ({basis_period})"] = res_df["LIC No"].map(sp_vol)
+        out_cnt = len(res_df)
+        
+        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
+        
+        if not res_df.empty:
+            st.dataframe(res_df, use_container_width=True)
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="sp_50cs_mhw_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        else:
+            st.success("🎉 No gap outlets found!")
+
+    elif any(x in query_type for x in ["Magic Moments", "MCD Lux", "IQ", "RSW", "RGW", "SRB7", "RCW", "All Season"]):
         if "Magic Moments" in query_type:
             driver_b, target_b = ["MMV", "MMFLV"], ["BLGLM", "BLGOR"]
             display_driver, display_target = "Magic Moments", "BLG"
@@ -1146,48 +1187,12 @@ with main_tab4:
         else:
             st.success("🎉 No gap outlets found!")
 
-    elif "Deluxe Industry > 30 CS" in query_type:
-        deluxe_vol = basis_combined[basis_combined["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
-        deluxe_30_lics = deluxe_vol[deluxe_vol > 30].index.tolist()
-        ibdc_billed = f_this[(f_this["Brand"] == "IBDC") & (f_this["Value"] > 0)]["LIC No"].unique()
-        
-        target_lics = set(deluxe_30_lics) - set(ibdc_billed)
-        res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df[f"Deluxe Vol ({basis_period})"] = res_df["LIC No"].map(deluxe_vol)
-        out_cnt = len(res_df)
-        
-        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
-        
-        if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True)
-            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="deluxe_30cs_ibdc_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        else:
-            st.success("🎉 No outlets found matching this condition!")
-
-    elif "Semi Premium Whisky Industry > 50 CS" in query_type:
-        sp_vol = basis_combined[basis_combined["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
-        sp_50_lics = sp_vol[sp_vol > 50].index.tolist()
-        mhw_billed = f_this[(f_this["Brand"] == "MHW") & (f_this["Value"] > 0)]["LIC No"].unique()
-        
-        target_lics = set(sp_50_lics) - set(mhw_billed)
-        res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df[f"Semi Premium Vol ({basis_period})"] = res_df["LIC No"].map(sp_vol)
-        out_cnt = len(res_df)
-        
-        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
-        
-        if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True)
-            st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="sp_50cs_mhw_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        else:
-            st.success("🎉 No outlets found matching this condition!")
-
     elif "Lapsed Outlets" in query_type:
         target_brands = ["SMG", "SMGP"] if "SMG" in query_type else ["SIW"]
         brand_name_str = "SMG + SMGP" if "SMG" in query_type else "SIW"
         
-        # 1. Collect all outlets that have billed the brand ANY TIME historically (M0 to M4)
-        all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4]
+        # 1. Collect all outlets that have billed the brand ANY TIME historically (TM, LM, M2, M3, M4, M5)
+        all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4, f_m5]
         anytime_billed = set()
         for d in all_time_dfs:
             if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
@@ -1234,7 +1239,6 @@ with main_tab4:
         
         marked_brands = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
         
-        # Build HTML table identical to Volume tab structure
         html_rr = '<div class="table-wrapper"><table class="custom-dashboard-table">'
         html_rr += f'<thead><tr><th class="seg-col-text">Brand</th><th>L3M Total</th><th>L3M Daily (/90)</th><th>TM Total</th><th>TM Daily (/{days_elapsed}D)</th><th>Growth (CS)</th><th>Growth %</th></tr></thead><tbody>'
         
@@ -1291,8 +1295,8 @@ with main_tab4:
         df_export_rr = pd.DataFrame(excel_rows)
         st.download_button("📥 Download in Excel", data=to_excel_bytes(df_export_rr), file_name="l3m_vs_tm_daily_run_segmented.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # --- 5-MONTH TREND TABLES ---
-    elif "Trend (5 Months)" in query_type:
+    # --- 6-MONTH TREND TABLES (TM, LM, M2, M3, M4, M5) ---
+    elif "Trend" in query_type:
         is_deluxe = "Deluxe" in query_type
         is_sp = "Semi Premium" in query_type
         is_ms = "MS%" in query_type
@@ -1306,21 +1310,22 @@ with main_tab4:
         brand_list = deluxe_brands if is_deluxe else sp_brands
         industry_segs = ["Deluxe-Whisky", "Deluxe Plus-Whisky"] if is_deluxe else ["Semi Premium-Whisky"]
         
+        trend_months = ["TM", "LM", "M2", "M3", "M4", "M5"]
         months_dict = {
             "TM": f_this,
             "LM": f_last,
             "M2": f_m2,
             "M3": f_m3,
-            "M4": f_m4
+            "M4": f_m4,
+            "M5": f_m5
         }
         
-        # Build 5-Month Table Structure
         html_trend = '<div class="table-wrapper"><table class="custom-dashboard-table">'
-        html_trend += '<thead><tr><th class="seg-col-text">Brand</th><th>TM</th><th>LM</th><th>M2</th><th>M3</th><th>M4</th></tr></thead><tbody>'
+        html_trend += '<thead><tr><th class="seg-col-text">Brand</th>' + ''.join([f'<th>{m}</th>' for m in trend_months]) + '</tr></thead><tbody>'
         
         # Industry Header Row
         html_trend += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{target_industry_name}</b></td>'
-        for m_key in ["TM", "LM", "M2", "M3", "M4"]:
+        for m_key in trend_months:
             m_df = months_dict[m_key]
             if m_df.empty:
                 html_trend += '<td>-</td>'
@@ -1337,7 +1342,7 @@ with main_tab4:
         # Brand Rows
         for b in brand_list:
             html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
-            for m_key in ["TM", "LM", "M2", "M3", "M4"]:
+            for m_key in trend_months:
                 m_df = months_dict[m_key]
                 if m_df.empty:
                     html_trend += '<td>-</td>'
