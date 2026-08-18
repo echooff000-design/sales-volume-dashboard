@@ -261,7 +261,8 @@ if not st.session_state["authenticated"]:
                         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
                         client = gspread.authorize(creds)
                         
-                        sheet = client.open("WB Login Logs").sheet1
+                        spreadsheet = client.open("WB Login Logs")
+                        sheet = spreadsheet.get_worksheet(0)
                         
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         now = datetime.datetime.now(ist_timezone)
@@ -326,7 +327,8 @@ with col_logo:
 with col_title:
     st.markdown("<h3 style='margin-top: 10px; font-size: 22px; color: #f8fafc;'>WB Sale Data</h3>", unsafe_allow_html=True)
 with col_logout:
-    st.markdown(f"<p style='text-align: right; margin-top: 15px; font-size: 13px; color: #f8fafc;'>👤 <b>{st.session_state['user_name']}</b></p>", unsafe_allow_html=True)
+    role_display = "Admin" if st.session_state.get("is_admin", False) else "User"
+    st.markdown(f"<p style='text-align: right; margin-top: 10px; font-size: 13px; color: #f8fafc;'>👤 <b>{st.session_state['user_name']}</b><br><span style='color: #60a5fa; font-size: 11px;'>{role_display}</span></p>", unsafe_allow_html=True)
     if st.button("Logout"):
         try:
             cookie_manager.delete("wb_sale_user")
@@ -356,11 +358,12 @@ if st.session_state.get("is_admin", False):
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        sheet = client.open("WB Login Logs").sheet1
+        spreadsheet = client.open("WB Login Logs")
+        sheet = spreadsheet.get_worksheet(0)
         data = sheet.get_all_records()
-        df_logs = pd.DataFrame(data)
         
-        if not df_logs.empty:
+        if data:
+            df_logs = pd.DataFrame(data)
             csv_logs = df_logs.to_csv(index=False).encode('utf-8')
             st.sidebar.download_button(
                 label="📥 Download Google Sheet Logs",
@@ -369,9 +372,9 @@ if st.session_state.get("is_admin", False):
                 mime="text/csv"
             )
         else:
-            st.sidebar.info("No logs found in Google Sheets yet.")
+            st.sidebar.info("Google Sheet log is currently empty.")
     except Exception as e:
-        st.sidebar.error("Could not fetch logs.")
+        st.sidebar.error("⚠️ Could not fetch logs. Check sharing permissions.")
 else:
     st.sidebar.info("Logs are saved securely in Google Sheets.")
 
