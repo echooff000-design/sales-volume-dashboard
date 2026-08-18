@@ -6,6 +6,8 @@ import datetime
 import os
 import base64
 import extra_streamlit_components as stx
+import gspread
+from google.oauth2.service_account import Credentials
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
@@ -100,44 +102,6 @@ hide_streamlit_style = """
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
-# --- 2. AUTOMATIC LOG FILE FIXER (SELF-HEALING) ---
-csv_file = "login_logs.csv"
-if os.path.exists(csv_file):
-    try:
-        with open(csv_file, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        
-        if len(lines) > 0 and not lines[0].startswith("Year,Date,Time,Name,User ID"):
-            new_lines = ["Year,Date,Time,Name,User ID\n"]
-            for line in lines:
-                line = line.strip()
-                if not line: continue
-                parts = line.split(",")
-                
-                if parts[0] == "Name" or parts[0] == "Year": 
-                    continue
-                    
-                if len(parts) == 3: 
-                    name, uid, time_val = parts[0], parts[1], parts[2]
-                    try:
-                        dt = pd.to_datetime(time_val)
-                        year = str(dt.year)
-                        date = dt.strftime("%Y-%m-%d")
-                        time_str = dt.strftime("%H:%M:%S")
-                    except:
-                        year = "2026"
-                        date = time_val[:10]
-                        time_str = time_val[11:]
-                    new_lines.append(f"{year},{date},{time_str},{name},{uid}\n")
-                    
-                elif len(parts) >= 5: 
-                    new_lines.append(line + "\n")
-            
-            with open(csv_file, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
-    except Exception as e:
-        pass
 
 # --- 3. COOKIE MANAGER SETUP ---
 def get_manager():
@@ -273,20 +237,27 @@ if not st.session_state["authenticated"]:
                     except Exception:
                         pass
                     
+                    # --- GOOGLE SHEETS BACKGROUND LOGGER ---
                     try:
+                        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                        creds_dict = dict(st.secrets["gcp_service_account"])
+                        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+                        client = gspread.authorize(creds)
+                        
+                        sheet = client.open("WB Login Logs").sheet1
+                        
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         now = datetime.datetime.now(ist_timezone)
-                        log_data = pd.DataFrame([{
-                            "Year": now.year,
-                            "Date": now.strftime("%Y-%m-%d"),
-                            "Time": now.strftime("%H:%M:%S"),
-                            "Name": st.session_state["user_name"],
-                            "User ID": input_user
-                        }])
-                        file_exists = os.path.exists(csv_file)
-                        log_data.to_csv(csv_file, mode='a', header=not file_exists, index=False, encoding='utf-8')
+                        
+                        sheet.append_row([
+                            str(now.year),
+                            now.strftime("%Y-%m-%d"),
+                            now.strftime("%H:%M:%S"),
+                            st.session_state["user_name"],
+                            str(input_user)
+                        ])
                     except Exception as e:
-                        print(f"Log error: {e}")
+                        print(f"Google Sheets Log error: {e}")
                     
                     st.rerun()
                 else:
@@ -316,8 +287,8 @@ st.markdown("""
         background-color: #ef4444 !important;
     }
 
-    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; touch-action: pan-x pan-y pinch-zoom !important; }
-    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; touch-action: pan-x pan-y pinch-zoom !important; }
+    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; }
     .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #d3d3d3 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
     .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #b0b0b0 !important; font-size: 8px; white-space: nowrap !important; }
     .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
@@ -358,11 +329,7 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
-if os.path.exists("login_logs.csv"):
-    with open("login_logs.csv", "rb") as file:
-        st.sidebar.download_button(label="📥 Download Full Yearly Logs", data=file, file_name="full_yearly_login_logs.csv", mime="text/csv")
-else:
-    st.sidebar.info("No login logs yet.")
+st.sidebar.info("Logs are saved securely in Google Sheets.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
@@ -543,7 +510,7 @@ def sort_asms(asm_list):
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
 
-# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER (RESTORED ZOOM BAR + PINCH TO ZOOM) ---
+# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER (ZOOM BAR + PINCH TO ZOOM) ---
 def render_zoomable_table(html_content):
     zoom_key = f"zoom_{hash(html_content) % 10000}"
     zoom_level = st.select_slider(
@@ -555,7 +522,7 @@ def render_zoomable_table(html_content):
     )
     
     wrapped_html = f"""
-    <div style="zoom: {zoom_level}%; -moz-transform: scale({zoom_level/100}); -moz-transform-origin: top left;">
+    <div style="zoom: {zoom_level}%; -moz-transform: scale({zoom_level/100}); -moz-transform-origin: top left; overflow-x: auto; touch-action: pan-x pan-y pinch-zoom;">
         {html_content}
     </div>
     """
