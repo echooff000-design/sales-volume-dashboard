@@ -191,41 +191,42 @@ if "Users" not in dfs:
 
 raw_users_df = dfs["Users"].copy()
 
-# Extract Date from F2 Cell
-days_elapsed = None
-f2_display_date = ""
-
-try:
-    date_col = next((c for c in raw_users_df.columns if str(c).strip().lower() == 'date'), None)
-    f2_val = None
-    if date_col is not None and len(raw_users_df) > 0:
-        f2_val = raw_users_df[date_col].iloc[0]
-    elif raw_users_df.shape[1] >= 6 and len(raw_users_df) > 0:
-        f2_val = raw_users_df.iloc[0, 5]
-
-    if pd.notna(f2_val) and str(f2_val).strip() != "":
-        raw_val_str = str(f2_val).strip()
-        if isinstance(f2_val, (datetime.datetime, datetime.date, pd.Timestamp)):
-            days_elapsed = int(f2_val.day)
-            f2_display_date = f2_val.strftime("%d %b %Y")
-        else:
-            parsed_d = pd.to_datetime(raw_val_str, errors='coerce', dayfirst=True)
-            if pd.notna(parsed_d):
-                days_elapsed = int(parsed_d.day)
-                f2_display_date = parsed_d.strftime("%d %b %Y")
-            else:
-                f2_display_date = raw_val_str
-                match = re.search(r'\b(\d{1,2})\b', raw_val_str)
-                if match:
-                    days_elapsed = int(match.group(1))
-except Exception:
-    pass
-
-if not days_elapsed:
+def extract_f2_date(df_u):
+    raw_val = None
+    date_col = next((c for c in df_u.columns if 'date' in str(c).strip().lower()), None)
+    if date_col is not None and len(df_u) > 0:
+        raw_val = df_u[date_col].iloc[0]
+    
+    if (pd.isna(raw_val) or raw_val is None or str(raw_val).strip() == "") and df_u.shape[1] >= 6 and len(df_u) > 0:
+        raw_val = df_u.iloc[0, 5]
+        
+    if pd.notna(raw_val) and str(raw_val).strip() != "":
+        if isinstance(raw_val, (datetime.datetime, datetime.date, pd.Timestamp)):
+            return int(raw_val.day), raw_val.strftime("%d %b %Y")
+        
+        try:
+            num_val = float(str(raw_val).strip())
+            if num_val > 30000:
+                dt = pd.to_datetime(num_val, unit='D', origin='1899-12-30')
+                return int(dt.day), dt.strftime("%d %b %Y")
+        except Exception:
+            pass
+        
+        val_str = str(raw_val).strip()
+        parsed_dt = pd.to_datetime(val_str, errors='coerce', dayfirst=True)
+        if pd.notna(parsed_dt):
+            return int(parsed_dt.day), parsed_dt.strftime("%d %b %Y")
+            
+        match = re.search(r'\b(\d{1,2})\b', val_str)
+        if match:
+            day_num = int(match.group(1))
+            return day_num, f"{day_num} Aug 2026"
+            
     ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    now_dt = datetime.datetime.now(ist_tz)
-    days_elapsed = now_dt.day
-    f2_display_date = now_dt.strftime("%d %b %Y")
+    today_dt = datetime.datetime.now(ist_tz)
+    return today_dt.day, today_dt.strftime("%d %b %Y")
+
+days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
 
 df_users = raw_users_df.copy()
 df_users.columns = df_users.columns.astype(str).str.strip().str.lower()
