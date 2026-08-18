@@ -103,6 +103,22 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# --- 2. GOOGLE SHEETS CLIENT HELPER ---
+def get_gspread_client():
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    return gspread.authorize(creds)
+
+def open_log_sheet(client):
+    # Try opening by Sheet ID first (from URL), fallback to title
+    sheet_id = "1iEBhkOnErBiWiXgl74dYV3fYxLJvCKnff8ptkxHZ8eo"
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+    except Exception:
+        spreadsheet = client.open("WB Login Logs")
+    return spreadsheet.get_worksheet(0)
+
 # --- 3. COOKIE MANAGER SETUP ---
 def get_manager():
     return stx.CookieManager()
@@ -256,13 +272,8 @@ if not st.session_state["authenticated"]:
                     
                     # --- GOOGLE SHEETS BACKGROUND LOGGER ---
                     try:
-                        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                        creds_dict = dict(st.secrets["gcp_service_account"])
-                        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-                        client = gspread.authorize(creds)
-                        
-                        spreadsheet = client.open("WB Login Logs")
-                        sheet = spreadsheet.get_worksheet(0)
+                        client = get_gspread_client()
+                        sheet = open_log_sheet(client)
                         
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                         now = datetime.datetime.now(ist_timezone)
@@ -275,7 +286,8 @@ if not st.session_state["authenticated"]:
                             str(input_user)
                         ])
                     except Exception as e:
-                        print(f"Google Sheets Log error: {e}")
+                        st.error(f"⚠️ Google Sheets Log Write Error: {e}")
+                        st.stop()
                     
                     st.rerun()
                 else:
@@ -353,16 +365,12 @@ st.sidebar.markdown("📋 **Admin Panel**")
 # --- CONDITIONAL ADMIN LOG DOWNLOAD ---
 if st.session_state.get("is_admin", False):
     try:
-        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        client = gspread.authorize(creds)
+        client = get_gspread_client()
+        sheet = open_log_sheet(client)
         
-        spreadsheet = client.open("WB Login Logs")
-        sheet = spreadsheet.get_worksheet(0)
-        data = sheet.get_all_records()
-        
-        if data:
+        all_values = sheet.get_all_values()
+        if len(all_values) > 1:
+            data = sheet.get_all_records()
             df_logs = pd.DataFrame(data)
             csv_logs = df_logs.to_csv(index=False).encode('utf-8')
             st.sidebar.download_button(
@@ -372,9 +380,9 @@ if st.session_state.get("is_admin", False):
                 mime="text/csv"
             )
         else:
-            st.sidebar.info("Google Sheet log is currently empty.")
+            st.sidebar.info("ℹ️ Log sheet is connected. No logs recorded yet.")
     except Exception as e:
-        st.sidebar.error("⚠️ Could not fetch logs. Check sharing permissions.")
+        st.sidebar.error(f"⚠️ Could not fetch logs: {e}")
 else:
     st.sidebar.info("Logs are saved securely in Google Sheets.")
 
