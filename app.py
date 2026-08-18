@@ -95,6 +95,8 @@ hide_streamlit_style = """
             .custom-dashboard-table th, .custom-dashboard-table td {
                 border: 1px solid #d3d3d3 !important;
                 padding: 4px 3px !important;
+                text-align: center; 
+                white-space: nowrap !important;
             }
             .custom-dashboard-table th {
                 background-color: #D9E1F2 !important;
@@ -536,7 +538,7 @@ df_raw = pd.pivot_table(
 ).reset_index()
 
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
-    df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str) + " (" + df_raw["LIC No"].astype(str) + ")"
+    df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
 # --- 8. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
@@ -1045,20 +1047,32 @@ with main_tab4:
         "Monarch": ["Monarch"]
     }
 
-    # Filter historical sets based on current scope
+    # Filter historical sets based on current scope (including Multiselect Search)
     def apply_active_filters(df_in):
         if df_in.empty: return df_in
         res = df_in.copy()
+        
+        # 1. Multiselect Search Filter (Matches LIC No / Outlet Name)
+        if selected_search:
+            valid_lics = filtered_df["LIC No"].dropna().astype(str).str.strip().unique()
+            if "LIC No" in res.columns:
+                res = res[res["LIC No"].astype(str).str.strip().isin(valid_lics)]
+            elif "Outlet Name" in res.columns:
+                valid_names = filtered_df["Outlet Name"].dropna().astype(str).str.strip().unique()
+                res = res[res["Outlet Name"].astype(str).str.strip().isin(valid_names)]
+                
+        # 2. Standard Dropdown Filters
         if selected_group != "All" and "Group" in res.columns:
-            res = res[res["Group"].astype(str) == selected_group]
+            res = res[res["Group"].astype(str).str.strip() == str(selected_group).strip()]
         if selected_asm != "All" and "ASM" in res.columns:
-            res = res[res["ASM"].astype(str) == selected_asm]
+            res = res[res["ASM"].astype(str).str.strip() == str(selected_asm).strip()]
         if selected_tse != "All" and "TSE" in res.columns:
-            res = res[res["TSE"].astype(str) == selected_tse]
+            res = res[res["TSE"].astype(str).str.strip() == str(selected_tse).strip()]
         if selected_lic != "All" and "LIC No" in res.columns:
-            res = res[res["LIC No"].astype(str) == selected_lic]
+            res = res[res["LIC No"].astype(str).str.strip() == str(selected_lic).strip()]
         if selected_outlet != "All" and "Outlet Name" in res.columns:
-            res = res[res["Outlet Name"].astype(str) == selected_outlet]
+            res = res[res["Outlet Name"].astype(str).str.strip() == str(selected_outlet).strip()]
+            
         return res
 
     f_this = apply_active_filters(df_this)
@@ -1332,7 +1346,8 @@ with main_tab4:
                 continue
             ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
             if is_ms:
-                html_trend += '<td>100.0%</td>'
+                ind_sum = ind_sub["Value"].sum()
+                html_trend += '<td>100.0%</td>' if ind_sum > 0 else '<td>0.0%</td>'
             elif is_vol:
                 html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
             elif is_wod:
