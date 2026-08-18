@@ -157,16 +157,22 @@ for col in df_users.columns:
         col_map["user_id"] = col
     elif "pass" in col:
         col_map["password"] = col
+    elif "role" in col or "admin" in col:
+        col_map["role"] = col
 
 if "Name" not in col_map or "user_id" not in col_map or "password" not in col_map:
-    st.error(f"❌ The 'Users' sheet columns were detected as: {list(dfs['Users'].columns)}. Please ensure your Excel columns are named: Name, user_id, password.")
+    st.error(f"❌ The 'Users' sheet columns were detected as: {list(dfs['Users'].columns)}. Please ensure your Excel columns include: Name, user_id, password.")
     st.stop()
 
-df_users = df_users.rename(columns={
+rename_dict = {
     col_map["Name"]: "Name",
     col_map["user_id"]: "user_id",
     col_map["password"]: "password"
-})
+}
+if "role" in col_map:
+    rename_dict[col_map["role"]] = "role"
+
+df_users = df_users.rename(columns=rename_dict)
 
 cached_user = None
 try:
@@ -178,9 +184,15 @@ if "authenticated" not in st.session_state:
     if cached_user:
         st.session_state["authenticated"] = True
         st.session_state["user_name"] = cached_user
+        user_row = df_users[df_users["Name"].astype(str).str.strip() == str(cached_user).strip()]
+        is_adm = False
+        if not user_row.empty and "role" in user_row.columns:
+            is_adm = str(user_row.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
+        st.session_state["is_admin"] = is_adm
     else:
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
+        st.session_state["is_admin"] = False
 
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -231,6 +243,11 @@ if not st.session_state["authenticated"]:
                 if not user_match.empty:
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    
+                    is_adm = False
+                    if "role" in user_match.columns:
+                        is_adm = str(user_match.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
+                    st.session_state["is_admin"] = is_adm
                     
                     try:
                         cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
@@ -317,6 +334,7 @@ with col_logout:
             pass
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
+        st.session_state["is_admin"] = False
         st.rerun()
 
 st.sidebar.markdown("📁 **Data Source**")
@@ -329,10 +347,36 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
-st.sidebar.info("Logs are saved securely in Google Sheets.")
+
+# --- CONDITIONAL ADMIN LOG DOWNLOAD ---
+if st.session_state.get("is_admin", False):
+    try:
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        
+        sheet = client.open("WB Login Logs").sheet1
+        data = sheet.get_all_records()
+        df_logs = pd.DataFrame(data)
+        
+        if not df_logs.empty:
+            csv_logs = df_logs.to_csv(index=False).encode('utf-8')
+            st.sidebar.download_button(
+                label="📥 Download Google Sheet Logs",
+                data=csv_logs,
+                file_name="google_sheets_login_logs.csv",
+                mime="text/csv"
+            )
+        else:
+            st.sidebar.info("No logs found in Google Sheets yet.")
+    except Exception as e:
+        st.sidebar.error("Could not fetch logs.")
+else:
+    st.sidebar.info("Logs are saved securely in Google Sheets.")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
+st.sidebar.markdown("🔗 **[Go to FTS Calculator](https://wbftscalculator.streamlit.app/)**")
 
 # --- 6. FETCH DATA FROM SHEETS ---
 required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
@@ -510,7 +554,7 @@ def sort_asms(asm_list):
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
 
-# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER (ZOOM BAR + PINCH TO ZOOM) ---
+# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER ---
 def render_zoomable_table(html_content):
     zoom_key = f"zoom_{hash(html_content) % 10000}"
     zoom_level = st.select_slider(
