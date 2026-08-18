@@ -127,7 +127,6 @@ cookie_manager = get_manager()
 # --- 4. DATA FETCHING (FROM STREAMLIT SECRETS) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
-# Read 2nd Historical Excel link from st.secrets with safe fallback
 if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
     RAW_HISTORICAL_URL = st.secrets["HISTORICAL_SHAREPOINT_URL"].split("?")[0] + "?download=1"
 else:
@@ -978,7 +977,7 @@ with main_tab4:
                 "SMG+SMGP Not Repeated Outlet List",
                 "SIW Not Repeated Outlet List",
                 # Run-rate & Trends
-                "Brand wise L3M Avg Run vs Current Month Daily Run",
+                "Brand wise L3M Avg vs Current Month Daily Run",
                 "Deluxe Industry - MS% Trend (5 Months)",
                 "Semi Premium Whisky Industry - MS% Trend (5 Months)",
                 "Deluxe Industry - Volume Trend (5 Months)",
@@ -1065,7 +1064,6 @@ with main_tab4:
         
         this_billed_target = f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
-        # Outlets that were active in basis period but unbilled for target brand in TM
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))]
         
         if not unbilled_df.empty:
@@ -1143,26 +1141,41 @@ with main_tab4:
     elif "Not Repeated Outlet List" in query_type:
         target_brands = ["SMG", "SMGP"] if "SMG" in query_type else ["SIW"]
         brand_name_str = "SMG+SMGP" if "SMG" in query_type else "SIW"
-        st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** in Previous Months (LM/M2/M3) but have NOT Repeated This Month:")
+        st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}**:")
         
-        prev_billed = set()
-        for d in [f_last, f_m2, f_m3]:
-            if not d.empty and "Brand" in d.columns:
-                prev_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
+        # 1. Collect all outlets that have billed the brand ANY TIME historically (M0 to M4)
+        all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4]
+        anytime_billed = set()
+        for d in all_time_dfs:
+            if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
+                anytime_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
         
+        # 2. Collect outlets that billed the brand in the selected basis period
+        eval_dfs = [f_last]
+        if "2" in basis_period: eval_dfs += [f_m2]
+        elif "3" in basis_period: eval_dfs += [f_m2, f_m3]
+        elif "4" in basis_period: eval_dfs += [f_m2, f_m3, f_m4]
+        
+        selected_period_billed = set()
+        for d in eval_dfs:
+            if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
+                selected_period_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
+                
+        # Also check current month
         tm_billed = set(f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].dropna().unique()) if not f_this.empty else set()
         
-        not_repeated = prev_billed - tm_billed
+        # Lapsed = Ever billed historically BUT not billed in evaluated criteria / current month
+        not_repeated = anytime_billed - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)]
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True)
             st.download_button(f"📥 Download {brand_name_str} Lapsed Outlets CSV", data=res_df.to_csv(index=False).encode('utf-8'), file_name=f"{brand_name_str}_not_repeated.csv", mime="text/csv")
         else:
-            st.success(f"🎉 All previous billers have repeated for {brand_name_str} this month!")
+            st.success(f"🎉 No lapsed / unrepeated outlets found for {brand_name_str} under the active criteria!")
 
-    elif "Brand wise L3M Avg Run vs Current Month Daily Run" in query_type:
-        st.markdown(f"#### 📊 Brand wise L3M Daily Run (L3M Vol / 90) vs TM Daily Run (TM Vol / {days_elapsed} days):")
+    elif "Brand wise L3M Avg vs Current Month Daily Run" in query_type:
+        st.markdown(f"#### 📊 Brand wise L3M Daily Run vs TM Daily Run (Based on Day {days_elapsed}):")
         
         # Calculate L3M Volume (LM + M2 + M3)
         l3m_dfs = [f_last]
@@ -1180,14 +1193,15 @@ with main_tab4:
             tm_v = tm_brand.get(b, 0)
             l3m_daily = round(l3m_v / 90.0, 1)
             tm_daily = round(tm_v / float(days_elapsed), 1)
-            growth = round(tm_daily - l3m_daily, 1)
+            growth_cs = round(tm_daily - l3m_daily, 1)
+            growth_pct = round(((tm_daily - l3m_daily) / l3m_daily) * 100, 1) if l3m_daily > 0 else (100.0 if tm_daily > 0 else 0.0)
+            
             rr_data.append({
                 "Brand": b,
-                "L3M Total Vol": int(l3m_v),
-                "L3M Daily Avg (/90)": l3m_daily,
-                "TM Vol": int(tm_v),
-                f"TM Daily Avg (/{days_elapsed})": tm_daily,
-                "Diff / Growth": growth
+                "L3M Daily Run": l3m_daily,
+                "TM Daily Run": tm_daily,
+                "Growth (CS)": growth_cs,
+                "Growth %": f"{growth_pct:+.1f}%"
             })
             
         df_rr = pd.DataFrame(rr_data)
