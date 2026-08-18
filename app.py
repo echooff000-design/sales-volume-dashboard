@@ -302,19 +302,26 @@ df_users = df_users.rename(columns=rename_dict)
 
 cached_user = None
 try:
-    cached_user = cookie_manager.get(cookie="wb_sale_user")
+    c_val = cookie_manager.get(cookie="wb_sale_user")
+    if c_val and str(c_val).strip().lower() not in ["none", "nan", "null", "undefined", ""]:
+        cached_user = str(c_val).strip()
 except Exception:
     pass
 
 if "authenticated" not in st.session_state:
     if cached_user:
-        st.session_state["authenticated"] = True
-        st.session_state["user_name"] = cached_user
-        user_row = df_users[df_users["Name"].astype(str).str.strip() == str(cached_user).strip()]
-        is_adm = False
-        if not user_row.empty and "role" in user_row.columns:
-            is_adm = str(user_row.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
-        st.session_state["is_admin"] = is_adm
+        user_row = df_users[df_users["Name"].astype(str).str.strip().str.lower() == cached_user.lower()]
+        if not user_row.empty:
+            st.session_state["authenticated"] = True
+            st.session_state["user_name"] = user_row.iloc[0]["Name"]
+            is_adm = False
+            if "role" in user_row.columns:
+                is_adm = str(user_row.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
+            st.session_state["is_admin"] = is_adm
+        else:
+            st.session_state["authenticated"] = False
+            st.session_state["user_name"] = ""
+            st.session_state["is_admin"] = False
     else:
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
@@ -376,7 +383,7 @@ if not st.session_state["authenticated"]:
                     st.session_state["is_admin"] = is_adm
                     
                     try:
-                        cookie_manager.set("wb_sale_user", st.session_state["user_name"], max_age=30*24*60*60)
+                        cookie_manager.set("wb_sale_user", str(st.session_state["user_name"]), max_age=30*24*60*60)
                     except Exception:
                         pass
                     
@@ -668,14 +675,13 @@ def sort_asms(asm_list):
     return sorted_normal + key_accounts
 
 # --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER ---
-def render_zoomable_table(html_content):
-    zoom_key = f"zoom_{hash(html_content) % 10000}"
+def render_zoomable_table(html_content, table_key):
     zoom_level = st.select_slider(
         "🔍 Table Zoom Control (Mobile / Desktop)",
         options=[100, 125, 150, 175, 200],
         value=100,
         format_func=lambda x: f"{x}%",
-        key=zoom_key
+        key=f"zoom_ctrl_{table_key}"
     )
     
     wrapped_html = f"""
@@ -815,7 +821,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -832,7 +838,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -849,7 +855,7 @@ def generate_hierarchy_table_1(df):
                 t_ms_m, _, _ = calc_ms_brand(t_df, "MHW")
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
+                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{ms_ibdc:.1f}%</td>'
                 html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
@@ -965,11 +971,11 @@ main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs(["📦 Volume", "📈 Ms%",
 
 with main_tab1:
     html_vol = generate_html_table(filtered_df, metric_type="Volume")
-    render_zoomable_table(html_vol)
+    render_zoomable_table(html_vol, "vol_tab")
 
 with main_tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
-    render_zoomable_table(html_ms)
+    render_zoomable_table(html_ms, "ms_tab")
 
 with main_tab3:
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
@@ -977,17 +983,17 @@ with main_tab3:
     with sub_tab1:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
         html_h1 = generate_hierarchy_table_1(filtered_df)
-        render_zoomable_table(html_h1)
+        render_zoomable_table(html_h1, "h1_tab")
 
     with sub_tab2:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
-        render_zoomable_table(html_h2)
+        render_zoomable_table(html_h2, "h2_tab")
 
     with sub_tab3:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
-        render_zoomable_table(html_h3)
+        render_zoomable_table(html_h3, "h3_tab")
 
 with main_tab4:
     st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
@@ -1146,7 +1152,6 @@ with main_tab4:
         
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))].copy()
         
-        # Clean compact header: Volume (CS)
         unbilled_df["Volume (CS)"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
         unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(unbilled_df)
@@ -1166,7 +1171,6 @@ with main_tab4:
         
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        # Clean compact header: Deluxe Vol (CS)
         res_df["Deluxe Vol (CS)"] = res_df["LIC No"].map(deluxe_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
@@ -1186,7 +1190,6 @@ with main_tab4:
         
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        # Clean compact header: SP Vol (CS)
         res_df["SP Vol (CS)"] = res_df["LIC No"].map(sp_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
@@ -1234,7 +1237,6 @@ with main_tab4:
         
         gap_lics = set(driver_outlets) - set(target_outlets)
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)].copy()
-        # Clean compact header: Billed Vol (CS)
         gap_df["Billed Vol (CS)"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).astype(int)
         gap_df = gap_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(gap_df)
@@ -1262,7 +1264,6 @@ with main_tab4:
         
         not_repeated = set(anytime_billed) - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)].copy()
-        # Clean compact header: Historical Vol (CS)
         res_df["Historical Vol (CS)"] = res_df["LIC No"].map(target_hist_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
@@ -1345,7 +1346,7 @@ with main_tab4:
         html_rr += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_l3m_vol):,}</td><td>{gt_l3m_daily:,.1f}</td><td>{int(gt_tm_vol):,}</td><td>{gt_tm_daily:,.1f}</td><td>{gt_growth_cs:+,.1f}</td><td>{gt_growth_pct:+,.1f}%</td></tr>'
         html_rr += '</tbody></table></div>'
         
-        render_zoomable_table(html_rr)
+        render_zoomable_table(html_rr, "rr_query")
         
         df_export_rr = pd.DataFrame(excel_rows)
         st.download_button("📥 Download in Excel", data=to_excel_bytes(df_export_rr), file_name="l3m_vs_tm_daily_run_segmented.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -1419,4 +1420,4 @@ with main_tab4:
             
         html_trend += '</tbody></table></div>'
         st.markdown(f"#### 📈 {query_type}:")
-        render_zoomable_table(html_trend)
+        render_zoomable_table(html_trend, "trend_query")
