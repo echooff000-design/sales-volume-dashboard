@@ -986,7 +986,7 @@ with main_tab4:
                 "-- Select a Query --",
                 # Gap / Opportunity Queries
                 "Non Billing Outlets",
-                "MMV Billed but BLGLM / BLGOR Not Billed",
+                "MMV / MMFLV Billed but BLGLM / BLGOR Not Billed",
                 "MCD Lux Billed but IBDC Not Billed",
                 "IQ Billed but IBDC Not Billed",
                 "Deluxe Industry > 30 CS but IBDC Not Billed",
@@ -1103,8 +1103,8 @@ with main_tab4:
             st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
 
     elif "Billed but" in query_type or "Billed But" in query_type or "Billed" in query_type and "Not Billed" in query_type:
-        if "MMV" in query_type:
-            driver_b, target_b = ["MMV"], ["BLGLM", "BLGOR"]
+        if "MMV" in query_type or "MMFLV" in query_type:
+            driver_b, target_b = ["MMV", "MMFLV"], ["BLGLM", "BLGOR"]
         elif "MCD Lux" in query_type:
             driver_b, target_b = ["MCD Lux"], ["IBDC"]
         elif "IQ" in query_type:
