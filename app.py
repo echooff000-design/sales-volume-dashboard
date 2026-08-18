@@ -985,8 +985,8 @@ with main_tab4:
             [
                 "-- Select a Query --",
                 # Gap / Opportunity Queries
-                "Non Billing Outlets",
-                "MMV / MMFLV Billed but BLGLM / BLGOR Not Billed",
+                "TIL Non Billed Outlets",
+                "Magic Moments Billed but BLG Not Billed",
                 "MCD Lux Billed but IBDC Not Billed",
                 "IQ Billed but IBDC Not Billed",
                 "Deluxe Industry > 30 CS but IBDC Not Billed",
@@ -1085,7 +1085,7 @@ with main_tab4:
     st.markdown("---")
 
     # --- QUERY EXECUTION LOGIC ---
-    if query_type == "Non Billing Outlets":
+    if query_type == "TIL Non Billed Outlets":
         target_brands = brand_family_map.get(target_brand_choice, [target_brand_choice])
         
         basis_billed = basis_combined[basis_combined["Value"] > 0]["LIC No"].unique() if "LIC No" in basis_combined.columns else []
@@ -1098,29 +1098,38 @@ with main_tab4:
         
         if not unbilled_df.empty:
             st.dataframe(unbilled_df, use_container_width=True)
-            st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"non_billing_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"til_non_billing_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success(f"🎉 No unbilled outlets found for {target_brand_choice} within the active filter scope!")
 
     elif "Billed but" in query_type or "Billed But" in query_type or "Billed" in query_type and "Not Billed" in query_type:
-        if "MMV" in query_type or "MMFLV" in query_type:
+        if "Magic Moments" in query_type:
             driver_b, target_b = ["MMV", "MMFLV"], ["BLGLM", "BLGOR"]
+            display_driver, display_target = "Magic Moments", "BLG"
         elif "MCD Lux" in query_type:
             driver_b, target_b = ["MCD Lux"], ["IBDC"]
+            display_driver, display_target = "MCD Lux", "IBDC"
         elif "IQ" in query_type:
             driver_b, target_b = ["IQ"], ["IBDC"]
+            display_driver, display_target = "IQ", "IBDC"
         elif "RSW" in query_type:
             driver_b, target_b = ["RSW"], ["MHW"]
+            display_driver, display_target = "RSW", "MHW"
         elif "RGW" in query_type:
             driver_b, target_b = ["RGW"], ["MHW"]
+            display_driver, display_target = "RGW", "MHW"
         elif "SRB7" in query_type:
             driver_b, target_b = ["SRB7"], ["MHW"]
+            display_driver, display_target = "SRB7", "MHW"
         elif "RCW" in query_type:
             driver_b, target_b = ["RCW"], ["MHW"]
+            display_driver, display_target = "RCW", "MHW"
         elif "All Season" in query_type:
             driver_b, target_b = ["All Season"], ["MHW"]
+            display_driver, display_target = "All Season", "MHW"
         else:
             driver_b, target_b = [], []
+            display_driver, display_target = "", ""
 
         driver_outlets = basis_combined[(basis_combined["Brand"].isin(driver_b)) & (basis_combined["Value"] > 0)]["LIC No"].unique() if "LIC No" in basis_combined.columns else []
         target_outlets = f_this[(f_this["Brand"].isin(target_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
@@ -1129,7 +1138,7 @@ with main_tab4:
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)]
         out_cnt = len(gap_df)
         
-        st.markdown(f"#### 🔍 Outlets Billing **{'/'.join(driver_b)}** in **{basis_period}** but NOT Billing **{'/'.join(target_b)}** this Month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets Billing **{display_driver}** in **{basis_period}** but NOT Billing **{display_target}** this Month (Total: {out_cnt:,} Outlets):")
         
         if not gap_df.empty:
             st.dataframe(gap_df, use_container_width=True)
@@ -1216,32 +1225,71 @@ with main_tab4:
         if not f_m3.empty: l3m_dfs.append(f_m3)
         
         l3m_comb = pd.concat(l3m_dfs, ignore_index=True)
-        l3m_brand = l3m_comb.groupby("Brand", observed=False)["Value"].sum()
-        tm_brand = f_this.groupby("Brand", observed=False)["Value"].sum()
         
-        all_b_names = sorted(list(set(l3m_brand.index).union(set(tm_brand.index))))
-        rr_data = []
-        for b in all_b_names:
-            l3m_v = l3m_brand.get(b, 0)
-            tm_v = tm_brand.get(b, 0)
-            l3m_daily = round(l3m_v / 90.0, 1)
-            tm_daily = round(tm_v / float(days_elapsed), 1)
-            growth_cs = round(tm_daily - l3m_daily, 1)
-            growth_pct = round(((tm_daily - l3m_daily) / l3m_daily) * 100, 1) if l3m_daily > 0 else (100.0 if tm_daily > 0 else 0.0)
+        grp_l3m = l3m_comb.groupby([seg_col, brand_col], as_index=False, observed=False)["Value"].sum().rename(columns={"Value": "L3M_Vol"})
+        grp_tm = f_this.groupby([seg_col, brand_col], as_index=False, observed=False)["Value"].sum().rename(columns={"Value": "TM_Vol"})
+        
+        rr_merged = pd.merge(master_brands, grp_l3m, on=[seg_col, brand_col], how="left").fillna(0)
+        rr_merged = pd.merge(rr_merged, grp_tm, on=[seg_col, brand_col], how="left").fillna(0)
+        
+        marked_brands = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
+        
+        # Build HTML table identical to Volume tab structure
+        html_rr = '<div class="table-wrapper"><table class="custom-dashboard-table">'
+        html_rr += f'<thead><tr><th class="seg-col-text">Brand</th><th>L3M Total</th><th>L3M Daily (/90)</th><th>TM Total</th><th>TM Daily (/{days_elapsed}D)</th><th>Growth (CS)</th><th>Growth %</th></tr></thead><tbody>'
+        
+        gt_l3m_vol = rr_merged["L3M_Vol"].sum()
+        gt_tm_vol = rr_merged["TM_Vol"].sum()
+        gt_l3m_daily = round(gt_l3m_vol / 90.0, 1)
+        gt_tm_daily = round(gt_tm_vol / float(days_elapsed), 1)
+        gt_growth_cs = round(gt_tm_daily - gt_l3m_daily, 1)
+        gt_growth_pct = round(((gt_tm_daily - gt_l3m_daily) / gt_l3m_daily) * 100, 1) if gt_l3m_daily > 0 else 0.0
+
+        excel_rows = []
+
+        for segment, seg_data in rr_merged.groupby(seg_col, sort=False, observed=False):
+            seg_l3m_v = seg_data["L3M_Vol"].sum()
+            seg_tm_v = seg_data["TM_Vol"].sum()
+            seg_l3m_d = round(seg_l3m_v / 90.0, 1)
+            seg_tm_d = round(seg_tm_v / float(days_elapsed), 1)
+            seg_g_cs = round(seg_tm_d - seg_l3m_d, 1)
+            seg_g_pct = round(((seg_tm_d - seg_l3m_d) / seg_l3m_d) * 100, 1) if seg_l3m_d > 0 else 0.0
             
-            rr_data.append({
-                "Brand": b,
-                "L3M Total Vol": int(l3m_v),
-                "L3M Daily Run (/90)": l3m_daily,
-                "TM Total Vol": int(tm_v),
-                f"TM Daily Run (/{days_elapsed} Days)": tm_daily,
-                "Growth (CS)": growth_cs,
-                "Growth %": f"{growth_pct:+.1f}%"
-            })
+            html_rr += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{int(seg_l3m_v):,}</td><td>{seg_l3m_d:,.1f}</td><td>{int(seg_tm_v):,}</td><td>{seg_tm_d:,.1f}</td><td>{seg_g_cs:+,.1f}</td><td>{seg_g_pct:+,.1f}%</td></tr>'
             
-        df_rr = pd.DataFrame(rr_data)
-        st.dataframe(df_rr, use_container_width=True)
-        st.download_button("📥 Download in Excel", data=to_excel_bytes(df_rr), file_name="l3m_vs_tm_daily_run.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            for _, row in seg_data.iterrows():
+                b_name = row[brand_col]
+                b_l3m_v = row["L3M_Vol"]
+                b_tm_v = row["TM_Vol"]
+                b_l3m_d = round(b_l3m_v / 90.0, 1)
+                b_tm_d = round(b_tm_v / float(days_elapsed), 1)
+                b_g_cs = round(b_tm_d - b_l3m_d, 1)
+                b_g_pct = round(((b_tm_d - b_l3m_d) / b_l3m_d) * 100, 1) if b_l3m_d > 0 else (100.0 if b_tm_d > 0 else 0.0)
+                
+                is_marked = b_name in marked_brands
+                bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
+                growth_highlight = 'background-color: #def7ec; color: #03543f;' if b_g_cs > 0 else ('background-color: #fde8e8; color: #9b1c1c;' if b_g_cs < 0 else '')
+                
+                html_rr += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{int(b_l3m_v):,}</td><td>{b_l3m_d:,.1f}</td><td>{int(b_tm_v):,}</td><td>{b_tm_d:,.1f}</td><td style="{growth_highlight}">{b_g_cs:+,.1f}</td><td style="{growth_highlight}">{b_g_pct:+,.1f}%</td></tr>'
+                
+                excel_rows.append({
+                    "Segment": segment,
+                    "Brand": b_name,
+                    "L3M Total Vol": int(b_l3m_v),
+                    "L3M Daily Run (/90)": b_l3m_d,
+                    "TM Total Vol": int(b_tm_v),
+                    f"TM Daily Run (/{days_elapsed} Days)": b_tm_d,
+                    "Growth (CS)": b_g_cs,
+                    "Growth %": f"{b_g_pct:+,.1f}%"
+                })
+
+        html_rr += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_l3m_vol):,}</td><td>{gt_l3m_daily:,.1f}</td><td>{int(gt_tm_vol):,}</td><td>{gt_tm_daily:,.1f}</td><td>{gt_growth_cs:+,.1f}</td><td>{gt_growth_pct:+,.1f}%</td></tr>'
+        html_rr += '</tbody></table></div>'
+        
+        render_zoomable_table(html_rr)
+        
+        df_export_rr = pd.DataFrame(excel_rows)
+        st.download_button("📥 Download in Excel", data=to_excel_bytes(df_export_rr), file_name="l3m_vs_tm_daily_run_segmented.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     # --- 5-MONTH TREND TABLES ---
     elif "Trend (5 Months)" in query_type:
