@@ -534,25 +534,6 @@ def sort_asms(asm_list):
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
 
-# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER ---
-def render_zoomable_table(html_content):
-    # Add a clean zoom toolbar right above the table so mobile users can easily scale text/table size
-    zoom_key = f"zoom_{hash(html_content) % 10000}"
-    zoom_level = st.select_slider(
-        "🔍 Table Zoom Control (Mobile / Desktop)",
-        options=[100, 125, 150, 175, 200],
-        value=100,
-        format_func=lambda x: f"{x}%",
-        key=zoom_key
-    )
-    
-    wrapped_html = f"""
-    <div style="zoom: {zoom_level}%; -moz-transform: scale({zoom_level/100}); -moz-transform-origin: top left; overflow-x: auto;">
-        {html_content}
-    </div>
-    """
-    st.markdown(wrapped_html, unsafe_allow_html=True)
-
 # --- 9. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
@@ -834,11 +815,11 @@ main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs(["📦 Volume", "📈 Ms%",
 
 with main_tab1:
     html_vol = generate_html_table(filtered_df, metric_type="Volume")
-    render_zoomable_table(html_vol)
+    st.write(html_vol, unsafe_allow_html=True)
 
 with main_tab2:
     html_ms = generate_html_table(filtered_df, metric_type="Ms%")
-    render_zoomable_table(html_ms)
+    st.write(html_ms, unsafe_allow_html=True)
 
 with main_tab3:
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
@@ -846,17 +827,17 @@ with main_tab3:
     with sub_tab1:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
         html_h1 = generate_hierarchy_table_1(filtered_df)
-        render_zoomable_table(html_h1)
+        st.write(html_h1, unsafe_allow_html=True)
 
     with sub_tab2:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
-        render_zoomable_table(html_h2)
+        st.write(html_h2, unsafe_allow_html=True)
 
     with sub_tab3:
         st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
-        render_zoomable_table(html_h3)
+        st.write(html_h3, unsafe_allow_html=True)
 
 with main_tab4:
     st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
