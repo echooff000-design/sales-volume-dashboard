@@ -4,3 +4,5 @@ requests
 openpyxl
 pyxlsb
 extra-streamlit-components
+gspread
+google-auth
