@@ -815,7 +815,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -832,7 +832,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -1146,7 +1146,8 @@ with main_tab4:
         
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))].copy()
         
-        unbilled_df[f"Total Vol ({basis_period}) [CS]"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
+        # Clean compact header: Volume (CS)
+        unbilled_df["Volume (CS)"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
         unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(unbilled_df)
         
@@ -1165,7 +1166,8 @@ with main_tab4:
         
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df[f"Deluxe Industry Vol ({basis_period}) [CS]"] = res_df["LIC No"].map(deluxe_vol).fillna(0).astype(int)
+        # Clean compact header: Deluxe Vol (CS)
+        res_df["Deluxe Vol (CS)"] = res_df["LIC No"].map(deluxe_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
@@ -1184,7 +1186,8 @@ with main_tab4:
         
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df[f"Semi Premium Vol ({basis_period}) [CS]"] = res_df["LIC No"].map(sp_vol).fillna(0).astype(int)
+        # Clean compact header: SP Vol (CS)
+        res_df["SP Vol (CS)"] = res_df["LIC No"].map(sp_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
@@ -1231,7 +1234,8 @@ with main_tab4:
         
         gap_lics = set(driver_outlets) - set(target_outlets)
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)].copy()
-        gap_df[f"{display_driver} Vol ({basis_period}) [CS]"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).astype(int)
+        # Clean compact header: Billed Vol (CS)
+        gap_df["Billed Vol (CS)"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).astype(int)
         gap_df = gap_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(gap_df)
         
@@ -1258,7 +1262,8 @@ with main_tab4:
         
         not_repeated = set(anytime_billed) - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)].copy()
-        res_df[f"Historical {brand_name_str} Vol [CS]"] = res_df["LIC No"].map(target_hist_vol).fillna(0).astype(int)
+        # Clean compact header: Historical Vol (CS)
+        res_df["Historical Vol (CS)"] = res_df["LIC No"].map(target_hist_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
