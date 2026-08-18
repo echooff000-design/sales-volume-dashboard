@@ -67,7 +67,7 @@ def get_f2_date(df_u):
         except Exception: pass
         p = pd.to_datetime(str(val).strip(), errors='coerce', dayfirst=True)
         if pd.notna(p): return int(p.day), p.strftime("%d %b %Y")
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, 30)))
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
     return now.day, now.strftime("%d %b %Y")
 
 days_elapsed, f2_display_date = get_f2_date(raw_users)
@@ -238,7 +238,7 @@ with t4:
         tm_b = f_this.groupby("Brand", observed=False)["Value"].sum()
         rr = []
         for b in sorted(set(l3m.index).union(tm_b.index)):
-            l_d, t_d = round(l3m.get(b, 0) / 90.0, 1), round(tm_brand := tm_b.get(b, 0) / float(days_elapsed), 1)
+            l_d, t_d = round(l3m.get(b, 0) / 90.0, 1), round(tm_b.get(b, 0) / float(days_elapsed), 1)
             rr.append({"Brand": b, "L3M Total": int(l3m.get(b,0)), "L3M Daily": l_d, "TM Total": int(tm_b.get(b,0)), f"TM Daily (/{days_elapsed}D)": t_d, "Growth (CS)": round(t_d - l_d, 1), "Growth %": f"{round(((t_d - l_d)/l_d)*100, 1) if l_d > 0 else 0.0:+,.1f}%"})
         st.dataframe(df_rr := pd.DataFrame(rr), use_container_width=True)
         st.download_button("📥 Download in Excel", data=to_excel_bytes(df_rr), file_name="run_rate.xlsx")
