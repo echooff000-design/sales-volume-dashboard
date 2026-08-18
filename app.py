@@ -272,33 +272,32 @@ def extract_f2_date(df_u):
 
 days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
 
+# Robust parsing of Users sheet (Col A = Name, Col B = user_id, Col C = password, Col D = role)
 df_users = raw_users_df.copy()
-df_users.columns = df_users.columns.astype(str).str.strip().str.lower()
 
-col_map = {}
+# Direct column mapping by position and name
+name_col = df_users.columns[0]
+user_id_col = df_users.columns[1] if len(df_users.columns) > 1 else df_users.columns[0]
+pass_col = df_users.columns[2] if len(df_users.columns) > 2 else df_users.columns[0]
+role_col = df_users.columns[3] if len(df_users.columns) > 3 else None
+
 for col in df_users.columns:
-    if "name" in col:
-        col_map["Name"] = col
-    elif "user" in col or "id" in col:
-        col_map["user_id"] = col
-    elif "pass" in col:
-        col_map["password"] = col
-    elif "role" in col or "admin" in col:
-        col_map["role"] = col
+    c_lower = str(col).strip().lower()
+    if "name" in c_lower:
+        name_col = col
+    elif "user" in c_lower or "id" in c_lower:
+        user_id_col = col
+    elif "pass" in c_lower:
+        pass_col = col
+    elif "role" in c_lower or "admin" in c_lower:
+        role_col = col
 
-if "Name" not in col_map or "user_id" not in col_map or "password" not in col_map:
-    st.error(f"❌ The 'Users' sheet columns were detected as: {list(dfs['Users'].columns)}. Please ensure your Excel columns include: Name, user_id, password.")
-    st.stop()
-
-rename_dict = {
-    col_map["Name"]: "Name",
-    col_map["user_id"]: "user_id",
-    col_map["password"]: "password"
-}
-if "role" in col_map:
-    rename_dict[col_map["role"]] = "role"
-
-df_users = df_users.rename(columns=rename_dict)
+df_users_clean = pd.DataFrame({
+    "Name": df_users[name_col].astype(str).str.strip(),
+    "user_id": df_users[user_id_col].astype(str).str.strip(),
+    "password": df_users[pass_col].astype(str).str.strip(),
+    "role": df_users[role_col].astype(str).str.strip() if role_col else "User"
+})
 
 cached_user = None
 try:
@@ -310,13 +309,11 @@ except Exception:
 
 if "authenticated" not in st.session_state:
     if cached_user:
-        user_row = df_users[df_users["Name"].astype(str).str.strip().str.lower() == cached_user.lower()]
-        if not user_row.empty:
+        user_row = df_users_clean[df_users_clean["Name"].str.lower() == cached_user.lower()]
+        if not user_row.empty and str(user_row.iloc[0]["Name"]).lower() not in ["nan", "none", ""]:
             st.session_state["authenticated"] = True
-            st.session_state["user_name"] = user_row.iloc[0]["Name"]
-            is_adm = False
-            if "role" in user_row.columns:
-                is_adm = str(user_row.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
+            st.session_state["user_name"] = str(user_row.iloc[0]["Name"])
+            is_adm = str(user_row.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
             st.session_state["is_admin"] = is_adm
         else:
             st.session_state["authenticated"] = False
@@ -326,6 +323,17 @@ if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
         st.session_state["is_admin"] = False
+
+# Auto-purge corrupted 'nan' session
+if st.session_state.get("authenticated", False) and str(st.session_state.get("user_name", "")).strip().lower() in ["nan", "none", ""]:
+    try:
+        cookie_manager.delete("wb_sale_user")
+    except Exception:
+        pass
+    st.session_state["authenticated"] = False
+    st.session_state["user_name"] = ""
+    st.session_state["is_admin"] = False
+    st.rerun()
 
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -368,22 +376,24 @@ if not st.session_state["authenticated"]:
             submit_btn = st.form_submit_button("Sign In")
             
             if submit_btn:
-                user_match = df_users[
-                    (df_users["user_id"].astype(str).str.strip() == str(input_user).strip()) & 
-                    (df_users["password"].astype(str).str.strip() == str(input_pass).strip())
+                user_match = df_users_clean[
+                    (df_users_clean["user_id"].str.lower() == str(input_user).strip().lower()) & 
+                    (df_users_clean["password"] == str(input_pass).strip())
                 ]
                 
                 if not user_match.empty:
+                    real_name = str(user_match.iloc[0]["Name"]).strip()
+                    if real_name.lower() in ["nan", "none", ""]:
+                        real_name = str(input_user).strip()
+                        
                     st.session_state["authenticated"] = True
-                    st.session_state["user_name"] = user_match.iloc[0]["Name"]
+                    st.session_state["user_name"] = real_name
                     
-                    is_adm = False
-                    if "role" in user_match.columns:
-                        is_adm = str(user_match.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
+                    is_adm = str(user_match.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
                     st.session_state["is_admin"] = is_adm
                     
                     try:
-                        cookie_manager.set("wb_sale_user", str(st.session_state["user_name"]), max_age=30*24*60*60)
+                        cookie_manager.set("wb_sale_user", real_name, max_age=30*24*60*60)
                     except Exception:
                         pass
                     
@@ -396,7 +406,7 @@ if not st.session_state["authenticated"]:
                             str(now.year),
                             now.strftime("%Y-%m-%d"),
                             now.strftime("%H:%M:%S"),
-                            st.session_state["user_name"],
+                            real_name,
                             str(input_user)
                         ])
                     except Exception as e:
@@ -444,7 +454,8 @@ with col_title:
     st.markdown("<h3 style='margin-top: 10px; font-size: 22px; color: #f8fafc; font-family: Calibri, sans-serif;'>WB Sale Data</h3>", unsafe_allow_html=True)
 with col_logout:
     role_display = "Admin" if st.session_state.get("is_admin", False) else "User"
-    st.markdown(f"<p style='text-align: right; margin-top: 10px; font-size: 13px; color: #f8fafc; font-family: Calibri, sans-serif;'>👤 <b>{st.session_state['user_name']}</b><br><span style='color: #60a5fa; font-size: 11px;'>{role_display}</span></p>", unsafe_allow_html=True)
+    user_display = st.session_state.get('user_name', 'User')
+    st.markdown(f"<p style='text-align: right; margin-top: 10px; font-size: 13px; color: #f8fafc; font-family: Calibri, sans-serif;'>👤 <b>{user_display}</b><br><span style='color: #60a5fa; font-size: 11px;'>{role_display}</span></p>", unsafe_allow_html=True)
     if st.button("Logout"):
         try:
             cookie_manager.delete("wb_sale_user")
@@ -821,7 +832,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
