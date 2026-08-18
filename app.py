@@ -995,7 +995,7 @@ with main_tab4:
         )
 
     # Lazy-load historical dataset if historical months are needed
-    needs_history = any(x in query_type for x in ["Trend", "L3M", "Repeated"]) or "2" in basis_period or "3" in basis_period or "4" in basis_period
+    needs_history = any(x in query_type for x in ["Trend", "L3M", "Repeated", "Billed", "Industry"]) or "2" in basis_period or "3" in basis_period or "4" in basis_period
     
     df_m2 = pd.DataFrame()
     df_m3 = pd.DataFrame()
@@ -1050,6 +1050,14 @@ with main_tab4:
     f_m3 = apply_active_filters(df_m3)
     f_m4 = apply_active_filters(df_m4)
 
+    # Compile the active basis dataset based on user dropdown selection
+    basis_dfs = [f_last]
+    if "2" in basis_period: basis_dfs += [f_m2]
+    elif "3" in basis_period: basis_dfs += [f_m2, f_m3]
+    elif "4" in basis_period: basis_dfs += [f_m2, f_m3, f_m4]
+    
+    basis_combined = pd.concat([d for d in basis_dfs if not d.empty], ignore_index=True) if basis_dfs else f_last
+
     # Master base outlets in current filtered scope
     base_outlets = filtered_df[["LIC No", "Outlet Name", "ASM", "TSE", "Group"]].drop_duplicates() if "LIC No" in filtered_df.columns else pd.DataFrame()
 
@@ -1059,21 +1067,13 @@ with main_tab4:
     if query_type == "Not Billed Outlet":
         target_brands = brand_family_map.get(target_brand_choice, [target_brand_choice])
         
-        # Outlets billed in selected basis period
-        basis_dfs = [f_last]
-        if "2" in basis_period: basis_dfs += [f_m2]
-        elif "3" in basis_period: basis_dfs += [f_m2, f_m3]
-        elif "4" in basis_period: basis_dfs += [f_m2, f_m3, f_m4]
-        
-        basis_combined = pd.concat(basis_dfs, ignore_index=True) if basis_dfs else f_last
         basis_billed = basis_combined[basis_combined["Value"] > 0]["LIC No"].unique() if "LIC No" in basis_combined.columns else []
-        
         this_billed_target = f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))]
         out_cnt = len(unbilled_df)
         
-        st.markdown(f"#### 🔍 Outlets that have not billed **{target_brand_choice}** this month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but NOT Billed **{target_brand_choice}** this month (Total: {out_cnt:,} Outlets):")
         
         if not unbilled_df.empty:
             st.dataframe(unbilled_df, use_container_width=True)
@@ -1101,14 +1101,16 @@ with main_tab4:
         else:
             driver_b, target_b = [], []
 
-        driver_outlets = f_this[(f_this["Brand"].isin(driver_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
+        # Find outlets billing driver brand in selected basis period
+        driver_outlets = basis_combined[(basis_combined["Brand"].isin(driver_b)) & (basis_combined["Value"] > 0)]["LIC No"].unique() if "LIC No" in basis_combined.columns else []
+        # Find outlets billing target brand in current month
         target_outlets = f_this[(f_this["Brand"].isin(target_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
         
         gap_lics = set(driver_outlets) - set(target_outlets)
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)]
         out_cnt = len(gap_df)
         
-        st.markdown(f"#### 🔍 Outlets Billing **{'/'.join(driver_b)}** but NOT Billing **{'/'.join(target_b)}** this month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets Billing **{'/'.join(driver_b)}** in **{basis_period}** but NOT Billing **{'/'.join(target_b)}** this month (Total: {out_cnt:,} Outlets):")
         
         if not gap_df.empty:
             st.dataframe(gap_df, use_container_width=True)
@@ -1117,16 +1119,16 @@ with main_tab4:
             st.success("🎉 No gap outlets found!")
 
     elif "Deluxe & Deluxe Plus Industry > 30 cs" in query_type:
-        deluxe_vol = f_this[f_this["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
+        deluxe_vol = basis_combined[basis_combined["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
         deluxe_30_lics = deluxe_vol[deluxe_vol > 30].index.tolist()
         ibdc_billed = f_this[(f_this["Brand"] == "IBDC") & (f_this["Value"] > 0)]["LIC No"].unique()
         
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df["Deluxe Industry Vol"] = res_df["LIC No"].map(deluxe_vol)
+        res_df[f"Deluxe Vol ({basis_period})"] = res_df["LIC No"].map(deluxe_vol)
         out_cnt = len(res_df)
         
-        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 cases but IBDC NOT Billed This Month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume > 30 cs in **{basis_period}** but IBDC NOT Billed This Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True)
@@ -1135,16 +1137,16 @@ with main_tab4:
             st.success("🎉 No outlets found matching this condition!")
 
     elif "Semi Premium Whisky Industry > 50 cs" in query_type:
-        sp_vol = f_this[f_this["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
+        sp_vol = basis_combined[basis_combined["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
         sp_50_lics = sp_vol[sp_vol > 50].index.tolist()
         mhw_billed = f_this[(f_this["Brand"] == "MHW") & (f_this["Value"] > 0)]["LIC No"].unique()
         
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df["Semi Premium Vol"] = res_df["LIC No"].map(sp_vol)
+        res_df[f"Semi Premium Vol ({basis_period})"] = res_df["LIC No"].map(sp_vol)
         out_cnt = len(res_df)
         
-        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 cases but MHW NOT Billed This Month (Total: {out_cnt:,} Outlets):")
+        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume > 50 cs in **{basis_period}** but MHW NOT Billed This Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True)
@@ -1164,20 +1166,15 @@ with main_tab4:
                 anytime_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
         
         # 2. Collect outlets that billed the brand in the selected basis period
-        eval_dfs = [f_last]
-        if "2" in basis_period: eval_dfs += [f_m2]
-        elif "3" in basis_period: eval_dfs += [f_m2, f_m3]
-        elif "4" in basis_period: eval_dfs += [f_m2, f_m3, f_m4]
-        
         selected_period_billed = set()
-        for d in eval_dfs:
+        for d in basis_dfs:
             if not d.empty and "Brand" in d.columns and "LIC No" in d.columns:
                 selected_period_billed.update(d[(d["Brand"].isin(target_brands)) & (d["Value"] > 0)]["LIC No"].dropna().unique())
                 
         # Current month billed
         tm_billed = set(f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].dropna().unique()) if not f_this.empty else set()
         
-        # Lapsed = Ever billed historically BUT not billed in evaluated criteria / current month
+        # Lapsed = Ever billed historically BUT not billed in evaluated basis criteria / current month
         not_repeated = anytime_billed - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)]
         out_cnt = len(res_df)
