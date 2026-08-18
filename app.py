@@ -103,7 +103,7 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- 2. GOOGLE SHEETS HELPER ---
+# --- 2. GOOGLE SHEETS CONNECTION HANDLER ---
 SHEET_ID = "1iEBhkOnErBiWiXgl74dYV3fYxLJvCKnff8ptkxHZ8eo"
 
 def get_sheet():
@@ -112,6 +112,8 @@ def get_sheet():
         "https://www.googleapis.com/auth/drive"
     ]
     creds_dict = dict(st.secrets["gcp_service_account"])
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_ID).sheet1
@@ -280,8 +282,7 @@ if not st.session_state["authenticated"]:
                             str(input_user)
                         ])
                     except Exception as e:
-                        st.error(f"⚠️ Google Sheets Write Error: {e}")
-                        st.stop()
+                        print(f"Logging error: {e}")
                     
                     st.rerun()
                 else:
@@ -376,7 +377,8 @@ if st.session_state.get("is_admin", False):
         else:
             st.sidebar.info("ℹ️ Google Sheet connected. No logins recorded yet.")
     except Exception as e:
-        st.sidebar.error(f"⚠️ Could not fetch logs: {e}")
+        err_msg = str(e).strip() if str(e).strip() else repr(e)
+        st.sidebar.error(f"⚠️ Log Connection Error: {err_msg}")
 else:
     st.sidebar.info("Logs are saved securely in Google Sheets.")
 
