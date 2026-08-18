@@ -74,11 +74,20 @@ hide_streamlit_style = """
                 background-color: #D9E1F2 !important;
             }
             
-            /* --- CLEAN THIN BORDER STYLING --- */
+            /* --- CLEAN THIN BORDER STYLING & MOBILE TWO-FINGER ZOOM SUPPORT --- */
+            .table-wrapper { 
+                width: 100%; 
+                overflow-x: auto; 
+                -webkit-overflow-scrolling: touch; 
+                margin-bottom: 20px; 
+                display: block; 
+                touch-action: pan-x pan-y pinch-zoom !important;
+            }
             .custom-dashboard-table {
                 border: 1px solid #d3d3d3 !important;
                 border-collapse: collapse !important;
                 background-color: #ffffff !important;
+                touch-action: pan-x pan-y pinch-zoom !important;
             }
             .custom-dashboard-table th, .custom-dashboard-table td {
                 border: 1px solid #d3d3d3 !important;
@@ -307,8 +316,8 @@ st.markdown("""
         background-color: #ef4444 !important;
     }
 
-    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; }
-    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; }
+    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; display: block; touch-action: pan-x pan-y pinch-zoom !important; }
+    .custom-dashboard-table { width: 100%; table-layout: auto; border-collapse: collapse !important; font-family: sans-serif; background-color: #ffffff; color: #000000; font-size: 8.5px; border: 1px solid #d3d3d3 !important; touch-action: pan-x pan-y pinch-zoom !important; }
     .custom-dashboard-table th, .custom-dashboard-table td { border: 1px solid #d3d3d3 !important; padding: 4px 3px !important; text-align: center; white-space: nowrap !important; }
     .custom-dashboard-table th { background-color: #D9E1F2; color: #000000; font-weight: bold; border-bottom: 2px solid #b0b0b0 !important; font-size: 8px; white-space: nowrap !important; }
     .subtotal-row { font-weight: bold; color: #000000; background-color: #F2F2F2; font-size: 8px; }
@@ -359,7 +368,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to Payment & KYC](https://wbpaymentkyc.streamlit.app/)**")
 
 # --- 6. FETCH DATA FROM SHEETS ---
-required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
+required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master", "Login Logs"]
 for sheet in required_sheets:
     if sheet not in dfs:
         st.error(f"❌ Could not find the sheet named '{sheet}' in your Excel file.")
@@ -716,7 +725,6 @@ def generate_hierarchy_table_2(df):
         html += '<th>LM</th><th>MTD</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
-    # Grand Total Row
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     for b in brands_to_show:
         lm, mtd, diff = calc_ms_brand(df, b)
