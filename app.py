@@ -272,31 +272,31 @@ def extract_f2_date(df_u):
 
 days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
 
-# Robust parsing of Users sheet (Col A = Name, Col B = user_id, Col C = password, Col D = role)
+# --- STRICT POSITIONAL & ROBUST NAME/USER_ID EXTRACTION ---
+# Col A (idx 0) = Name | Col B (idx 1) = user_id | Col C (idx 2) = password | Col D (idx 3) = role
 df_users = raw_users_df.copy()
 
-# Direct column mapping by position and name
-name_col = df_users.columns[0]
-user_id_col = df_users.columns[1] if len(df_users.columns) > 1 else df_users.columns[0]
-pass_col = df_users.columns[2] if len(df_users.columns) > 2 else df_users.columns[0]
-role_col = df_users.columns[3] if len(df_users.columns) > 3 else None
+name_idx = 0
+user_idx = 1 if df_users.shape[1] > 1 else 0
+pass_idx = 2 if df_users.shape[1] > 2 else 0
+role_idx = 3 if df_users.shape[1] > 3 else None
 
-for col in df_users.columns:
-    c_lower = str(col).strip().lower()
-    if "name" in c_lower:
-        name_col = col
-    elif "user" in c_lower or "id" in c_lower:
-        user_id_col = col
-    elif "pass" in c_lower:
-        pass_col = col
-    elif "role" in c_lower or "admin" in c_lower:
-        role_col = col
+for idx, col in enumerate(df_users.columns):
+    c_clean = str(col).strip().lower()
+    if c_clean in ["name", "emp name", "employee name", "sales rep"] and "user" not in c_clean and "id" not in c_clean:
+        name_idx = idx
+    elif c_clean in ["user_id", "userid", "user id", "phone", "mobile", "login id", "user_name"]:
+        user_idx = idx
+    elif "pass" in c_clean:
+        pass_idx = idx
+    elif "role" in c_clean or "admin" in c_clean:
+        role_idx = idx
 
 df_users_clean = pd.DataFrame({
-    "Name": df_users[name_col].astype(str).str.strip(),
-    "user_id": df_users[user_id_col].astype(str).str.strip(),
-    "password": df_users[pass_col].astype(str).str.strip(),
-    "role": df_users[role_col].astype(str).str.strip() if role_col else "User"
+    "Name": df_users.iloc[:, name_idx].astype(str).str.strip(),
+    "user_id": df_users.iloc[:, user_idx].astype(str).str.strip(),
+    "password": df_users.iloc[:, pass_idx].astype(str).str.strip(),
+    "role": df_users.iloc[:, role_idx].astype(str).str.strip() if role_idx is not None else "User"
 })
 
 cached_user = None
@@ -397,7 +397,7 @@ if not st.session_state["authenticated"]:
                     except Exception:
                         pass
                     
-                    # --- GOOGLE SHEETS BACKGROUND LOGGER ---
+                    # --- GOOGLE SHEETS BACKGROUND LOGGER (NAME IN COL D, USER ID IN COL E) ---
                     try:
                         sheet = get_sheet()
                         ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -407,7 +407,7 @@ if not st.session_state["authenticated"]:
                             now.strftime("%Y-%m-%d"),
                             now.strftime("%H:%M:%S"),
                             real_name,
-                            str(input_user)
+                            str(input_user).strip()
                         ])
                     except Exception as e:
                         print(f"Logging error: {e}")
@@ -849,7 +849,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_i:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
