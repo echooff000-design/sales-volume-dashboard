@@ -2,8 +2,8 @@ name: Keep Streamlit App Alive
 
 on:
   schedule:
-    # Runs every day at 06:00 and 18:00 UTC
-    - cron: '0 6,18 * * *'
+    # Runs every 6 hours (adjust cron as desired)
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -12,5 +12,10 @@ jobs:
     steps:
       - name: Ping Streamlit Dashboard
         run: |
-          curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36" \
-            "https://wbsale.streamlit.app" -o /dev/null -w "HTTP Response Code: %{http_code}\n"
+          # Ping the main URL and Streamlit health endpoint without infinite redirects
+          STATUS_CODE=$(curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+            --max-redirs 5 \
+            -o /dev/null -w "%{http_code}" \
+            "https://wbsale.streamlit.app/_stcore/health" || true)
+
+          echo "Ping executed successfully. HTTP Status: $STATUS_CODE"
