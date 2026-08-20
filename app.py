@@ -20,7 +20,6 @@ hide_streamlit_style = """
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             
-            /* --- FORCE SIDEBAR TO STAY DARK & PRESERVE MATERIAL ICONS --- */
             [data-testid="stSidebar"] {
                 background-color: #0f172a !important;
                 border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -34,7 +33,6 @@ hide_streamlit_style = """
                 color: #60a5fa !important;
             }
             
-            /* --- FIX SIDEBAR BUTTONS & DOWNLOAD BUTTONS VISIBILITY IN LIGHT/NORMAL MODE --- */
             [data-testid="stSidebar"] .stButton button, 
             [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
                 background-color: #1e293b !important;
@@ -57,7 +55,6 @@ hide_streamlit_style = """
                 color: #ffffff !important;
             }
             
-            /* --- FREEZE PANE STICKY COLUMN STYLING --- */
             .table-wrapper th:first-child,
             .table-wrapper td:first-child {
                 position: sticky !important;
@@ -80,7 +77,6 @@ hide_streamlit_style = """
                 background-color: #D9E1F2 !important;
             }
             
-            /* --- STANDARD CALIBRI FONT & CLEAN TABLE STYLING --- */
             .table-wrapper { 
                 width: 100%; 
                 overflow-x: auto; 
@@ -288,7 +284,6 @@ def extract_f2_date(df_u):
 
 days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
 
-# Strict Positional Extraction (Col A = Name, Col B = user_id, Col C = password, Col D = role)
 df_users = raw_users_df.copy()
 name_idx = 0
 user_idx = 1 if df_users.shape[1] > 1 else 0
@@ -379,12 +374,9 @@ if not st.session_state["authenticated"]:
         <style>
         .stApp { background-color: #0f172a !important; font-family: Calibri, 'Segoe UI', Arial, sans-serif !important; }
         [data-testid="stForm"] { background: rgba(30, 41, 59, 0.7) !important; backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 40px 30px !important; border-radius: 20px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; }
-        
         .stTextInput label { color: #94a3b8 !important; font-weight: 500; font-size: 13px; }
-        .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; transition: all 0.3s ease; }
-        .stTextInput input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-        .stButton button { width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 10px; font-weight: 600; padding: 12px; border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); transition: all 0.3s ease; }
-        .stButton button:hover { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4); color: white; }
+        .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 12px 14px !important; }
+        .stButton button { width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 10px; font-weight: 600; padding: 12px; border: none; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -395,14 +387,7 @@ if not st.session_state["authenticated"]:
             try:
                 with open("logo.png", "rb") as img_file:
                     encoded_img = base64.b64encode(img_file.read()).decode()
-                st.markdown(
-                    f"""
-                    <div style="display: flex; justify-content: center; width: 100%; margin-bottom: 10px;">
-                        <img src="data:image/png;base64,{encoded_img}" style="width: 100px; display: block;" />
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.markdown(f'<div style="display: flex; justify-content: center; width: 100%; margin-bottom: 10px;"><img src="data:image/png;base64,{encoded_img}" style="width: 100px; display: block;" /></div>', unsafe_allow_html=True)
             except Exception:
                 pass
                     
@@ -466,23 +451,11 @@ st.markdown("""
     .stApp { background-color: #0f172a !important; font-family: Calibri, 'Segoe UI', Arial, sans-serif !important; }
     [data-testid="stSidebar"] * { color: #ffffff !important; }
     [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: #f8fafc !important; font-weight: 600 !important; font-size: 13px !important; }
-    
     .stTabs [data-baseweb="tab-list"] button div p, 
     .stTabs [data-baseweb="tab-list"] button span,
-    .stTabs [data-baseweb="tab"] p {
-        color: #ef4444 !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] div p, 
-    .stTabs [data-baseweb="tab"][aria-selected="true"] span,
-    .stTabs [data-baseweb="tab"][aria-selected="true"] p {
-        color: #ef4444 !important;
-        font-weight: 700 !important;
-    }
-    .stTabs [data-baseweb="tab-highlight"] {
-        background-color: #ef4444 !important;
-    }
+    .stTabs [data-baseweb="tab"] p { color: #ef4444 !important; font-weight: 600 !important; font-size: 14px !important; }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p { color: #ef4444 !important; font-weight: 700 !important; }
+    .stTabs [data-baseweb="tab-highlight"] { background-color: #ef4444 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -593,7 +566,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER ---
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (FIXED CASCADING & MASTER BRAND GRID) ---
 def build_offline_html_bundle():
     records_export = []
     for _, row in df_raw.iterrows():
@@ -608,8 +581,7 @@ def build_offline_html_bundle():
             "brand": str(row.get("Brand", "")).strip(),
             "tm": float(row.get("This Month", 0)),
             "lm": float(row.get("Last Month", 0)),
-            "tgt": float(row.get("Target", 0)),
-            "m2": 0, "m3": 0, "m4": 0, "m5": 0
+            "tgt": float(row.get("Target", 0))
         })
 
     users_export = df_users_clean.to_dict(orient="records")
@@ -659,7 +631,7 @@ def build_offline_html_bundle():
 <body>
     <div id="loginSection" class="login-box">
         <h2 style="text-align: center; margin-top: 0; font-size: 22px;">WB Sale Data</h2>
-        <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px;">100% Offline Standalone PWA</p>
+        <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px;">100% Offline Standalone App</p>
         <div style="margin-bottom: 12px;"><label>User ID</label><input type="text" id="loginUser" placeholder="Enter User ID"></div>
         <div style="margin-bottom: 20px;"><label>Password</label><input type="password" id="loginPass" placeholder="Enter Password"></div>
         <button class="btn btn-blue" style="width: 100%;" onclick="handleLogin()">Sign In</button>
@@ -680,11 +652,11 @@ def build_offline_html_bundle():
         <div class="card">
             <h4 style="margin: 0 0 10px 0; font-size: 16px;">🔍 Filters</h4>
             <div class="grid-filters">
-                <div><label>Group</label><select id="selGroup" onchange="onFilterChange()"></select></div>
-                <div><label>ASM</label><select id="selASM" onchange="onFilterChange()"></select></div>
-                <div><label>TSE</label><select id="selTSE" onchange="onFilterChange()"></select></div>
-                <div><label>LIC No</label><select id="selLIC" onchange="onFilterChange()"></select></div>
-                <div><label>Outlet</label><select id="selOutlet" onchange="onFilterChange()"></select></div>
+                <div><label>Group</label><select id="selGroup" onchange="onGroupChange()"></select></div>
+                <div><label>ASM</label><select id="selASM" onchange="onASMChange()"></select></div>
+                <div><label>TSE</label><select id="selTSE" onchange="onTSEChange()"></select></div>
+                <div><label>LIC No</label><select id="selLIC" onchange="onLICChange()"></select></div>
+                <div><label>Outlet</label><select id="selOutlet" onchange="onOutletChange()"></select></div>
             </div>
         </div>
         <div class="tab-bar">
@@ -710,20 +682,29 @@ def build_offline_html_bundle():
     <script>
         const appUsers = {users_json_str};
         const appSales = {sales_json_str};
+
         const SEG_ORDER = ["Deluxe-Whisky", "Semi Premium-Whisky", "Deluxe-Gin", "Premium-Brandy", "Premium-Gin", "Semi Premium-Brandy", "Single Malt-Scotch"];
-        const BRAND_ORDER = ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak", "MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR", "BLGLM", "BLGOR", "Big Ben", "Blue Riband", "Monarch", "SMG", "SMGP", "MHFB", "SIW"];
+        const MASTER_STRUCTURE = [
+            {{ seg: "Deluxe-Whisky", brands: ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"] }},
+            {{ seg: "Semi Premium-Whisky", brands: ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"] }},
+            {{ seg: "Deluxe-Gin", brands: ["BLGLM", "BLGOR", "Big Ben", "Blue Riband"] }},
+            {{ seg: "Premium-Brandy", brands: ["Monarch"] }},
+            {{ seg: "Premium-Gin", brands: ["SMG", "SMGP"] }},
+            {{ seg: "Semi Premium-Brandy", brands: ["MHFB"] }},
+            {{ seg: "Single Malt-Scotch", brands: ["SIW"] }}
+        ];
         const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
 
         function handleLogin() {{
             const u = document.getElementById('loginUser').value.trim().toLowerCase();
             const p = document.getElementById('loginPass').value.trim();
-            const matched = appUsers.find(x => (x.user_id.toLowerCase() === u || x.Name.toLowerCase() === u) && x.password === p);
+            const matched = appUsers.find(x => (String(x.user_id).toLowerCase() === u || String(x.Name).toLowerCase() === u) && String(x.password) === p);
             if (matched) {{
                 document.getElementById('loginSection').style.display = 'none';
                 document.getElementById('mainDashboard').style.display = 'block';
                 document.getElementById('userBadge').innerHTML = `👤 <b>${{matched.Name}}</b><br><span>${{matched.role || 'User'}}</span>`;
-                populateFilters();
-                onFilterChange();
+                initCascadingFilters();
+                updateDashboard();
             }} else {{
                 document.getElementById('loginError').style.display = 'block';
             }}
@@ -734,95 +715,202 @@ def build_offline_html_bundle():
             document.getElementById('loginSection').style.display = 'block';
         }}
 
-        function populateFilters() {{
-            const fill = (id, key) => {{
-                const vals = ['All', ...new Set(appSales.map(d => d[key]).filter(Boolean))].sort();
-                document.getElementById(id).innerHTML = vals.map(v => `<option value="${{v}}">${{v}}</option>`).join('');
-            }};
-            fill('selGroup', 'group'); fill('selASM', 'asm'); fill('selTSE', 'tse'); fill('selLIC', 'lic'); fill('selOutlet', 'outlet');
-        }}
-
-        function getFiltered() {{
+        /* --- TRUE CASCADING FILTER LOGIC --- */
+        function getScopedRecords(level) {{
             const grp = document.getElementById('selGroup').value;
             const asm = document.getElementById('selASM').value;
             const tse = document.getElementById('selTSE').value;
             const lic = document.getElementById('selLIC').value;
-            const out = document.getElementById('selOutlet').value;
-            return appSales.filter(d => (grp === 'All' || d.group === grp) && (asm === 'All' || d.asm === asm) && (tse === 'All' || d.tse === tse) && (lic === 'All' || d.lic === lic) && (out === 'All' || d.outlet === out));
+
+            return appSales.filter(d => {{
+                if (level >= 1 && grp !== 'All' && d.group !== grp) return false;
+                if (level >= 2 && asm !== 'All' && d.asm !== asm) return false;
+                if (level >= 3 && tse !== 'All' && d.tse !== tse) return false;
+                if (level >= 4 && lic !== 'All' && d.lic !== lic) return false;
+                return true;
+            }});
         }}
 
-        function onFilterChange() {{
-            const data = getFiltered();
-            renderVol(data); renderMS(data); runAskAssistant();
+        function setSelectOptions(id, values, keepSelected = true) {{
+            const sel = document.getElementById(id);
+            const prev = sel.value;
+            sel.innerHTML = '<option value="All">All</option>' + values.map(v => `<option value="${{encodeURIComponent(v)}}">${{v}}</option>`).join('');
+            if (keepSelected && values.includes(prev)) sel.value = encodeURIComponent(prev);
+            else sel.value = 'All';
+        }}
+
+        function initCascadingFilters() {{
+            const groups = [...new Set(appSales.map(d => d.group).filter(Boolean))].sort();
+            setSelectOptions('selGroup', groups, false);
+            onGroupChange();
+        }}
+
+        function onGroupChange() {{
+            const scope = getScopedRecords(1);
+            const asms = [...new Set(scope.map(d => d.asm).filter(Boolean))].sort();
+            setSelectOptions('selASM', asms, false);
+            onASMChange();
+        }}
+
+        function onASMChange() {{
+            const scope = getScopedRecords(2);
+            const tses = [...new Set(scope.map(d => d.tse).filter(Boolean))].sort();
+            setSelectOptions('selTSE', tses, false);
+            onTSEChange();
+        }}
+
+        function onTSEChange() {{
+            const scope = getScopedRecords(3);
+            const lics = [...new Set(scope.map(d => d.lic).filter(Boolean))].sort();
+            setSelectOptions('selLIC', lics, false);
+            onLICChange();
+        }}
+
+        function onLICChange() {{
+            const scope = getScopedRecords(4);
+            const outlets = [...new Set(scope.map(d => d.outlet).filter(Boolean))].sort();
+            setSelectOptions('selOutlet', outlets, false);
+            updateDashboard();
+        }}
+
+        function onOutletChange() {{
+            const outVal = decodeURIComponent(document.getElementById('selOutlet').value);
+            if (outVal !== 'All') {{
+                const matched = appSales.find(d => d.outlet === outVal);
+                if (matched) {{
+                    document.getElementById('selLIC').value = encodeURIComponent(matched.lic);
+                }}
+            }}
+            updateDashboard();
+        }}
+
+        function getFilteredData() {{
+            const grp = decodeURIComponent(document.getElementById('selGroup').value);
+            const asm = decodeURIComponent(document.getElementById('selASM').value);
+            const tse = decodeURIComponent(document.getElementById('selTSE').value);
+            const lic = decodeURIComponent(document.getElementById('selLIC').value);
+            const out = decodeURIComponent(document.getElementById('selOutlet').value);
+
+            return appSales.filter(d => {{
+                if (grp !== 'All' && d.group !== grp) return false;
+                if (asm !== 'All' && d.asm !== asm) return false;
+                if (tse !== 'All' && d.tse !== tse) return false;
+                if (lic !== 'All' && d.lic !== lic) return false;
+                if (out !== 'All' && d.outlet !== out) return false;
+                return true;
+            }});
+        }}
+
+        function updateDashboard() {{
+            const data = getFilteredData();
+            renderVol(data);
+            renderMS(data);
+            runAskAssistant();
         }}
 
         function renderVol(data) {{
             let html = '', gtLM = 0, gtTGT = 0, gtTM = 0, gtBAL = 0;
-            SEG_ORDER.forEach(seg => {{
-                const sData = data.filter(d => d.seg === seg);
-                const sLM = sData.reduce((a,c)=>a+c.lm, 0), sTGT = sData.reduce((a,c)=>a+c.tgt, 0), sTM = sData.reduce((a,c)=>a+c.tm, 0);
-                html += `<tr class="subtotal-row"><td>${{seg}}</td><td>${{Math.round(sLM)}}</td><td>${{Math.round(sTGT)}}</td><td>${{Math.round(sTM)}}</td><td></td></tr>`;
-                BRAND_ORDER.filter(b => sData.some(d=>d.brand===b)).forEach(b => {{
-                    const bData = sData.filter(d => d.brand === b);
-                    const lm = bData.reduce((a,c)=>a+c.lm,0), tgt = bData.reduce((a,c)=>a+c.tgt,0), tm = bData.reduce((a,c)=>a+c.tm,0);
-                    const isM = MARKED_BRANDS.includes(b), bal = isM ? (tgt - tm) : '';
-                    if(isM) gtBAL += (tgt - tm);
+
+            MASTER_STRUCTURE.forEach(group => {{
+                const segName = group.seg;
+                const segRecords = data.filter(d => d.seg === segName);
+                const sLM = segRecords.reduce((a,c)=>a+c.lm, 0);
+                const sTGT = segRecords.reduce((a,c)=>a+c.tgt, 0);
+                const sTM = segRecords.reduce((a,c)=>a+c.tm, 0);
+
+                html += `<tr class="subtotal-row"><td>${{segName}}</td><td>${{Math.round(sLM)}}</td><td>${{Math.round(sTGT)}}</td><td>${{Math.round(sTM)}}</td><td></td></tr>`;
+
+                group.brands.forEach(b => {{
+                    const bRecords = segRecords.filter(d => d.brand === b);
+                    const lm = bRecords.reduce((a,c)=>a+c.lm, 0);
+                    const tgt = bRecords.reduce((a,c)=>a+c.tgt, 0);
+                    const tm = bRecords.reduce((a,c)=>a+c.tm, 0);
+                    const isM = MARKED_BRANDS.includes(b);
+                    const bal = isM ? (tgt - tm) : '';
+                    if (isM) gtBAL += (tgt - tm);
+
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
                     html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm)}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm)}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
                 }});
+
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
             }});
+
             html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM)}}</td><td>${{Math.round(gtTGT)}}</td><td>${{Math.round(gtTM)}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
         }}
 
         function renderMS(data) {{
             let html = '', gtLM = data.reduce((a,c)=>a+c.lm,0)||1, gtTM = data.reduce((a,c)=>a+c.tm,0)||1;
-            SEG_ORDER.forEach(seg => {{
-                const sData = data.filter(d=>d.seg===seg);
-                const sLM = sData.reduce((a,c)=>a+c.lm,0), sTM = sData.reduce((a,c)=>a+c.tm,0);
-                html += `<tr class="subtotal-row"><td>${{seg}}</td><td>${{((sLM/gtLM)*100).toFixed(1)}}%</td><td>${{((sTM/gtTM)*100).toFixed(1)}}%</td><td>${{(((sTM/gtTM)-(sLM/gtLM))*100).toFixed(1)}}%</td></tr>`;
-                BRAND_ORDER.filter(b=>sData.some(d=>d.brand===b)).forEach(b=>{{
-                    const bData = sData.filter(d=>d.brand===b);
-                    const lm = bData.reduce((a,c)=>a+c.lm,0), tm = bData.reduce((a,c)=>a+c.tm,0);
-                    const grw = (sTM>0?(tm/sTM)*100:0) - (sLM>0?(lm/sLM)*100:0);
-                    html += `<tr class="brand-row"><td class="brand-col-text">${{b}}</td><td>${{sLM>0?((lm/sLM)*100).toFixed(1):'0.0'}}%</td><td>${{sTM>0?((tm/sTM)*100).toFixed(1):'0.0'}}%</td><td class="${{grw>0?'highlight-green':(grw<0?'highlight-red':'')}}">${{grw.toFixed(1)}}%</td></tr>`;
+
+            MASTER_STRUCTURE.forEach(group => {{
+                const segName = group.seg;
+                const segRecords = data.filter(d => d.seg === segName);
+                const sLM = segRecords.reduce((a,c)=>a+c.lm, 0);
+                const sTM = segRecords.reduce((a,c)=>a+c.tm, 0);
+                const sLMPct = (sLM / gtLM) * 100;
+                const sTMPct = (sTM / gtTM) * 100;
+
+                html += `<tr class="subtotal-row"><td>${{segName}}</td><td>${{sLMPct.toFixed(1)}}%</td><td>${{sTMPct.toFixed(1)}}%</td><td>${{(sTMPct - sLMPct).toFixed(1)}}%</td></tr>`;
+
+                group.brands.forEach(b => {{
+                    const bRecords = segRecords.filter(d => d.brand === b);
+                    const lm = bRecords.reduce((a,c)=>a+c.lm, 0);
+                    const tm = bRecords.reduce((a,c)=>a+c.tm, 0);
+                    const bLMPct = sLM > 0 ? (lm / sLM) * 100 : 0;
+                    const bTMPct = sTM > 0 ? (tm / sTM) * 100 : 0;
+                    const grw = bTMPct - bLMPct;
+                    const hl = grw > 0 ? 'highlight-green' : (grw < 0 ? 'highlight-red' : '');
+
+                    html += `<tr class="brand-row"><td class="brand-col-text">${{b}}</td><td>${{bLMPct.toFixed(1)}}%</td><td>${{bTMPct.toFixed(1)}}%</td><td class="${{hl}}">${{grw.toFixed(1)}}%</td></tr>`;
                 }});
             }});
+
             html += `<tr class="grand-total-row"><td>Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>`;
             document.getElementById('bodyMS').innerHTML = html;
         }}
 
         function runAskAssistant() {{
             const q = document.getElementById('askQuery').value;
-            const data = getFiltered();
-            const uniqueOutlets = [...new Set(data.map(d=>d.outlet))].sort();
+            const data = getFilteredData();
+            const uniqueOutlets = [...new Set(data.map(d => d.outlet).filter(Boolean))].sort();
             let html = `<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>`;
             let cnt = 0;
+
             uniqueOutlets.forEach(out => {{
-                const rows = data.filter(d=>d.outlet===out);
+                const rows = data.filter(d => d.outlet === out);
                 if (q.includes("Deluxe Industry >=")) {{
-                    const dVol = rows.filter(d=>d.seg.includes('Deluxe')).reduce((a,c)=>a+c.tm,0);
-                    const iVol = rows.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+c.tm,0);
-                    if (dVol >= 30 && iVol === 0) {{ cnt++; html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`; }}
+                    const dVol = rows.filter(d => d.seg && d.seg.includes('Deluxe')).reduce((a,c)=>a+c.tm, 0);
+                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+c.tm, 0);
+                    if (dVol >= 30 && iVol === 0) {{
+                        cnt++;
+                        html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`;
+                    }}
                 }} else if (q.includes("Semi Premium Whisky Industry >=")) {{
-                    const sVol = rows.filter(d=>d.seg==='Semi Premium-Whisky').reduce((a,c)=>a+c.tm,0);
-                    const mVol = rows.filter(d=>d.brand==='MHW').reduce((a,c)=>a+c.tm,0);
-                    if (sVol >= 50 && mVol === 0) {{ cnt++; html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(sVol)}}</b></td></tr>`; }}
+                    const sVol = rows.filter(d => d.seg === 'Semi Premium-Whisky').reduce((a,c)=>a+c.tm, 0);
+                    const mVol = rows.filter(d => d.brand === 'MHW').reduce((a,c)=>a+c.tm, 0);
+                    if (sVol >= 50 && mVol === 0) {{
+                        cnt++;
+                        html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(sVol)}}</b></td></tr>`;
+                    }}
                 }} else {{
-                    const bVol = rows.reduce((a,c)=>a+c.lm,0);
-                    const iVol = rows.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+c.tm,0);
-                    if (bVol > 0 && iVol === 0) {{ cnt++; html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(bVol)}}</b></td></tr>`; }}
+                    const bVol = rows.reduce((a,c)=>a+c.lm, 0);
+                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+c.tm, 0);
+                    if (bVol > 0 && iVol === 0) {{
+                        cnt++;
+                        html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(bVol)}}</b></td></tr>`;
+                    }}
                 }}
             }});
-            if(!cnt) html += `<tr><td colspan="5">🎉 No gap outlets found!</td></tr>`;
+
+            if (!cnt) html += `<tr><td colspan="5">🎉 No gap outlets found!</td></tr>`;
             document.getElementById('askTable').innerHTML = html + '</tbody>';
         }}
 
         function switchMainTab(id) {{
-            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-            ['tabVol','tabMS','tabAsk'].forEach(t=>document.getElementById(t).style.display='none');
-            document.getElementById(id).style.display='block';
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            ['tabVol','tabMS','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            document.getElementById(id).style.display = 'block';
             event.target.classList.add('active');
         }}
     </script>
@@ -830,7 +918,7 @@ def build_offline_html_bundle():
 </html>"""
     return html_template
 
-# --- SIDEBAR WITH NEW OFFLINE OPTION ---
+# --- SIDEBAR WITH OFFLINE APP DOWNLOAD ---
 st.sidebar.markdown("📁 **Data Source**")
 st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
 
@@ -841,7 +929,6 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("⚡ **Offline Capabilities**")
 
-# Generate standalone offline PWA file
 offline_html_data = build_offline_html_bundle()
 st.sidebar.download_button(
     label="📲 Download Offline App (PWA)",
@@ -1108,7 +1195,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -1125,7 +1212,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_i:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -1142,7 +1229,7 @@ def generate_hierarchy_table_1(df):
                 t_ms_m, _, _ = calc_ms_brand(t_df, "MHW")
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
+                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{ms_ibdc:.1f}%</td>'
                 html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
