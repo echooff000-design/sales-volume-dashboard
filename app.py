@@ -593,9 +593,9 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (CACHED) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (CACHED WITH USER BYPASS) ---
 @st.cache_data
-def get_injected_offline_html(df_json, users_json):
+def get_injected_offline_html(df_json, user_name, user_role):
     if os.path.exists("offline_template.html"):
         with open("offline_template.html", "r", encoding="utf-8") as f:
             template = f.read()
@@ -618,7 +618,7 @@ def get_injected_offline_html(df_json, users_json):
             "tgt": float(row.get("Target", 0) or 0)
         })
 
-    return template.replace("{{USERS_JSON}}", users_json).replace("{{SALES_JSON}}", json.dumps(records_export))
+    return template.replace("{{ACTIVE_USER}}", user_name).replace("{{ACTIVE_ROLE}}", user_role).replace("{{SALES_JSON}}", json.dumps(records_export))
 
 # --- SIDEBAR WITH OFFLINE LAUNCHER & ADMIN PANEL ---
 st.sidebar.markdown("📁 **Data Source**")
@@ -631,7 +631,10 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("⚡ **Offline Capabilities**")
 
-html_payload = get_injected_offline_html(df_raw.to_json(orient="records"), df_users_clean.to_json(orient="records"))
+active_name = st.session_state.get("user_name", "User")
+active_role = "Admin" if st.session_state.get("is_admin", False) else "User"
+
+html_payload = get_injected_offline_html(df_raw.to_json(orient="records"), active_name, active_role)
 b64_html = base64.b64encode(html_payload.encode("utf-8")).decode("utf-8")
 
 launch_btn_code = f"""
@@ -1493,7 +1496,7 @@ with main_tab4:
         html_trend += '</tr>'
         
         for b in brand_list:
-            html_trend += f'<tr class="brand-row"><td class="seg-col-text">{b}</td>'
+            html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
             for m_key in trend_months:
                 m_df = months_dict[m_key]
                 if m_df.empty:
