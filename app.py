@@ -163,11 +163,29 @@ def get_sheet():
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_ID).sheet1
 
-# --- 3. COOKIE MANAGER SETUP ---
+# --- 3. COOKIE MANAGER & 12:02 AM IST EXPIRATION HELPERS ---
 def get_manager():
     return stx.CookieManager()
 
 cookie_manager = get_manager()
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+
+def get_current_session_cycle_date(now_ist):
+    """Determines the current active cycle date anchored at 12:02 AM IST."""
+    cutoff_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
+    if now_ist < cutoff_today:
+        return (now_ist.date() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    return now_ist.date().strftime("%Y-%m-%d")
+
+def get_seconds_until_next_1202_am(now_ist):
+    """Calculates remaining seconds until next 12:02:00 AM IST."""
+    target_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
+    if now_ist < target_today:
+        next_cutoff = target_today
+    else:
+        next_cutoff = target_today + datetime.timedelta(days=1)
+    diff = int((next_cutoff - now_ist).total_seconds())
+    return max(diff, 60)
 
 # --- 4. EXCEL EXPORT HELPER FUNCTION ---
 def to_excel_bytes(df):
@@ -266,8 +284,7 @@ def extract_f2_date(df_u):
             day_num = int(match.group(1))
             return day_num, f"{day_num} Aug 2026"
             
-    ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    today_dt = datetime.datetime.now(ist_tz)
+    today_dt = datetime.datetime.now(IST)
     return today_dt.day, today_dt.strftime("%d %b %Y")
 
 days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
@@ -299,40 +316,69 @@ df_users_clean = pd.DataFrame({
     "role": df_users.iloc[:, role_idx].astype(str).str.strip() if role_idx is not None else "User"
 })
 
-cached_user = None
+# --- 12:02 AM IST LOGOUT VALIDATION ---
+now_ist = datetime.datetime.now(IST)
+active_cycle_date = get_current_session_cycle_date(now_ist)
+
+cached_user_val = None
+cached_user_cycle = None
 try:
     c_val = cookie_manager.get(cookie="wb_sale_user")
+    c_cycle = cookie_manager.get(cookie="wb_sale_cycle")
     if c_val and str(c_val).strip().lower() not in ["none", "nan", "null", "undefined", ""]:
-        cached_user = str(c_val).strip()
+        cached_user_val = str(c_val).strip()
+        cached_user_cycle = str(c_cycle).strip() if c_cycle else None
 except Exception:
     pass
 
+# Expire session if from previous day cycle (crossed 12:02 AM IST)
+if cached_user_val and cached_user_cycle != active_cycle_date:
+    try:
+        cookie_manager.delete("wb_sale_user")
+        cookie_manager.delete("wb_sale_cycle")
+    except Exception:
+        pass
+    cached_user_val = None
+
 if "authenticated" not in st.session_state:
-    if cached_user:
-        user_row = df_users_clean[df_users_clean["Name"].str.lower() == cached_user.lower()]
+    if cached_user_val:
+        user_row = df_users_clean[df_users_clean["Name"].str.lower() == cached_user_val.lower()]
         if not user_row.empty and str(user_row.iloc[0]["Name"]).lower() not in ["nan", "none", ""]:
             st.session_state["authenticated"] = True
             st.session_state["user_name"] = str(user_row.iloc[0]["Name"])
+            st.session_state["session_cycle"] = active_cycle_date
             is_adm = str(user_row.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
             st.session_state["is_admin"] = is_adm
         else:
             st.session_state["authenticated"] = False
             st.session_state["user_name"] = ""
+            st.session_state["session_cycle"] = ""
             st.session_state["is_admin"] = False
     else:
         st.session_state["authenticated"] = False
         st.session_state["user_name"] = ""
+        st.session_state["session_cycle"] = ""
         st.session_state["is_admin"] = False
+
+# Live in-session 12:02 AM boundary check
+if st.session_state.get("authenticated", False):
+    if st.session_state.get("session_cycle") != active_cycle_date:
+        try:
+            cookie_manager.delete("wb_sale_user")
+            cookie_manager.delete("wb_sale_cycle")
+        except Exception:
+            pass
+        st.session_state.update({"authenticated": False, "user_name": "", "session_cycle": "", "is_admin": False})
+        st.rerun()
 
 # Auto-purge corrupted 'nan' session
 if st.session_state.get("authenticated", False) and str(st.session_state.get("user_name", "")).strip().lower() in ["nan", "none", ""]:
     try:
         cookie_manager.delete("wb_sale_user")
+        cookie_manager.delete("wb_sale_cycle")
     except Exception:
         pass
-    st.session_state["authenticated"] = False
-    st.session_state["user_name"] = ""
-    st.session_state["is_admin"] = False
+    st.session_state.update({"authenticated": False, "user_name": "", "session_cycle": "", "is_admin": False})
     st.rerun()
 
 if not st.session_state["authenticated"]:
@@ -385,27 +431,32 @@ if not st.session_state["authenticated"]:
                     real_name = str(user_match.iloc[0]["Name"]).strip()
                     if real_name.lower() in ["nan", "none", ""]:
                         real_name = str(input_user).strip()
-                        
+                    
+                    cur_now = datetime.datetime.now(IST)
+                    cur_cycle = get_current_session_cycle_date(cur_now)
+                    seconds_to_expiry = get_seconds_until_next_1202_am(cur_now)
+                    
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = real_name
+                    st.session_state["session_cycle"] = cur_cycle
                     
                     is_adm = str(user_match.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
                     st.session_state["is_admin"] = is_adm
                     
                     try:
-                        cookie_manager.set("wb_sale_user", real_name, max_age=30*24*60*60)
+                        cookie_manager.set("wb_sale_user", real_name, max_age=seconds_to_expiry)
+                        cookie_manager.set("wb_sale_cycle", cur_cycle, max_age=seconds_to_expiry)
                     except Exception:
                         pass
                     
                     # --- GOOGLE SHEETS BACKGROUND LOGGER (NAME IN COL D, USER ID IN COL E) ---
                     try:
                         sheet = get_sheet()
-                        ist_timezone = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-                        now = datetime.datetime.now(ist_timezone)
+                        now_log = datetime.datetime.now(IST)
                         sheet.append_row([
-                            str(now.year),
-                            now.strftime("%Y-%m-%d"),
-                            now.strftime("%H:%M:%S"),
+                            str(now_log.year),
+                            now_log.strftime("%Y-%m-%d"),
+                            now_log.strftime("%H:%M:%S"),
                             real_name,
                             str(input_user).strip()
                         ])
@@ -459,11 +510,10 @@ with col_logout:
     if st.button("Logout"):
         try:
             cookie_manager.delete("wb_sale_user")
+            cookie_manager.delete("wb_sale_cycle")
         except Exception:
             pass
-        st.session_state["authenticated"] = False
-        st.session_state["user_name"] = ""
-        st.session_state["is_admin"] = False
+        st.session_state.update({"authenticated": False, "user_name": "", "session_cycle": "", "is_admin": False})
         st.rerun()
 
 # --- SIDEBAR WITH DYNAMIC USER F2 DATE ---
@@ -849,7 +899,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_i:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
