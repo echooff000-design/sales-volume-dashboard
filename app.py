@@ -39,18 +39,6 @@ def get_sheet():
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds).open_by_key(SHEET_ID).sheet1
 
-def get_manager():
-    return stx.CookieManager()
-
-cookie_manager = get_manager()
-IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-
-def get_current_session_cycle_date(now_ist):
-    cutoff_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
-    if now_ist < cutoff_today:
-        return (now_ist.date() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-    return now_ist.date().strftime("%Y-%m-%d")
-
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 @st.cache_data(ttl=300)
@@ -78,20 +66,29 @@ df_users_clean = pd.DataFrame({
     "role": raw_users_df.iloc[:, 3].astype(str).str.strip() if raw_users_df.shape[1] > 3 else "User"
 })
 
-# --- DATA PROCESSOR ---
+# --- DATA PROCESSOR WITH ROBUST COLUMN MAPPING ---
 df_this = dfs["This Month"].copy()
 df_last = dfs["Last Month"].copy()
 df_target = dfs["Target Data"].copy()
 df_outlet = dfs["Outlet Master"].copy()
-df_outlet.columns = df_outlet.columns.astype(str).str.strip()
 
-group_mapping = dict(zip(df_outlet["LIC No"].astype(str).str.strip(), df_outlet["Group"].astype(str).str.strip())) if "LIC No" in df_outlet.columns else {}
+df_outlet.columns = df_outlet.columns.astype(str).str.strip()
+if "Outlet Nan" in df_outlet.columns:
+    df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
+
+# Find Group column dynamically
+group_col = next((c for c in df_outlet.columns if c.lower() in ["group", "grp"]), None)
+if not group_col and len(df_outlet.columns) > 7:
+    group_col = df_outlet.columns[7]
+
+map_key = "LIC No" if "LIC No" in df_outlet.columns else ("Outlet Name" if "Outlet Name" in df_outlet.columns else df_outlet.columns[0])
+group_mapping = dict(zip(df_outlet[map_key].astype(str).str.strip(), df_outlet[group_col].astype(str).str.strip())) if group_col else {}
 
 def standardize_df(d):
     d = d.copy()
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value"}, inplace=True)
-    k_col = "LIC No" if "LIC No" in d.columns else None
+    k_col = "LIC No" if "LIC No" in d.columns else (d.columns[0] if len(d.columns) > 0 else None)
     if k_col:
         d["Group"] = d[k_col].astype(str).str.strip().map(group_mapping).fillna("Unassigned")
         d["Zone"] = "West Bengal"
@@ -109,7 +106,10 @@ dim_cols = [c for c in df_combined.columns if c not in ["Metric", "Value"]]
 df_raw = pd.pivot_table(df_combined, values="Value", index=dim_cols, columns="Metric", aggfunc="sum").reset_index()
 
 for c in ["This Month", "Last Month", "Target"]:
-    df_raw[c] = pd.to_numeric(df_raw[c], errors="coerce").fillna(0)
+    if c in df_raw.columns:
+        df_raw[c] = pd.to_numeric(df_raw[c], errors="coerce").fillna(0)
+    else:
+        df_raw[c] = 0.0
 
 # --- OFFLINE BUNDLER INJECTING INTO TEMPLATE ---
 @st.cache_data
@@ -120,7 +120,6 @@ def get_injected_offline_html(df_json, users_json):
     else:
         template = "<html><body>Template file missing in repository!</body></html>"
     
-    # Clean records export
     records_export = []
     for row in json.loads(df_json):
         records_export.append({
@@ -179,6 +178,5 @@ with st.sidebar:
     components.html(launch_btn_code, height=50)
     st.caption("💡 *Works 100% offline. Use the 'Check Update' button inside to sync when back online.*")
 
-# Render Normal Online Streamlit Interface Below...
 st.markdown("### Online Dashboard Active")
 st.dataframe(df_raw.head(10))
