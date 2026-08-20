@@ -128,7 +128,7 @@
         function handleLogin() {
             const u = document.getElementById('loginUser').value.trim().toLowerCase();
             const p = document.getElementById('loginPass').value.trim();
-            
+
             const matched = appUsers.find(x => {
                 const dbUser = String(x.user_id || '').trim().toLowerCase();
                 const dbName = String(x.Name || '').trim().toLowerCase();
@@ -310,7 +310,7 @@
                     html += `<tr><td>${rows[0].lic}</td><td style="text-align:left;">${rows[0].outlet}</td><td>${rows[0].asm}</td><td>${rows[0].tse}</td><td><b>${Math.round(dVol)}</b></td></tr>`;
                 }
             });
-            if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>';
+            if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>`;
             document.getElementById('askTable').innerHTML = html + '</tbody>';
         }
 
