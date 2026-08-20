@@ -46,10 +46,10 @@
     <div id="loginSection" class="login-box">
         <h2 style="text-align: center; margin-top: 0; font-size: 22px;">WB Sale Data</h2>
         <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px;">Offline PWA Dashboard</p>
-        <div style="margin-bottom: 12px;"><label>User ID</label><input type="text" id="loginUser" placeholder="Enter User ID"></div>
+        <div style="margin-bottom: 12px;"><label>User ID or Name</label><input type="text" id="loginUser" placeholder="Enter User ID (e.g. 8013624305) or Name"></div>
         <div style="margin-bottom: 20px;"><label>Password</label><input type="password" id="loginPass" placeholder="Enter Password"></div>
         <button class="btn btn-blue" style="width: 100%;" onclick="handleLogin()">Sign In</button>
-        <div id="loginError" style="color: #ef4444; font-size: 12px; margin-top: 10px; text-align: center; display: none;">❌ Invalid Credentials</div>
+        <div id="loginError" style="color: #ef4444; font-size: 12.5px; margin-top: 12px; text-align: center; display: none;">❌ Invalid User ID or Password</div>
     </div>
 
     <div id="mainDashboard" style="display: none;">
@@ -130,8 +130,8 @@
             const p = document.getElementById('loginPass').value.trim();
 
             const matched = appUsers.find(x => {
-                const dbUser = String(x.user_id || '').trim().toLowerCase();
-                const dbName = String(x.Name || '').trim().toLowerCase();
+                const dbUser = String(x.user_id || x.User_ID || '').trim().toLowerCase();
+                const dbName = String(x.name || x.Name || '').trim().toLowerCase();
                 const dbPass = String(x.password || '').trim();
                 return (dbUser === u || dbName === u) && dbPass === p;
             });
@@ -139,7 +139,9 @@
             if (matched) {
                 document.getElementById('loginSection').style.display = 'none';
                 document.getElementById('mainDashboard').style.display = 'block';
-                document.getElementById('userBadge').innerHTML = `👤 <b>${matched.Name}</b><br><span>${matched.role || 'User'}</span>`;
+                const realName = matched.name || matched.Name || 'User';
+                const realRole = matched.Role || matched.role || 'User';
+                document.getElementById('userBadge').innerHTML = `👤 <b>${realName}</b><br><span>${realRole}</span>`;
                 initCascadingFilters();
                 updateDashboard();
             } else {
@@ -310,7 +312,7 @@
                     html += `<tr><td>${rows[0].lic}</td><td style="text-align:left;">${rows[0].outlet}</td><td>${rows[0].asm}</td><td>${rows[0].tse}</td><td><b>${Math.round(dVol)}</b></td></tr>`;
                 }
             });
-            if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>`;
+            if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>';
             document.getElementById('askTable').innerHTML = html + '</tbody>';
         }
 
