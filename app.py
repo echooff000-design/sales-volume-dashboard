@@ -571,7 +571,7 @@ for c in ["This Month", "Last Month", "Target"]:
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (ZERO-NAN SANITIZED) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (ALL FEATURES INCLUDED) ---
 def build_offline_html_bundle():
     records_export = []
     
@@ -626,6 +626,9 @@ def build_offline_html_bundle():
         .tab-bar {{ display: flex; gap: 12px; border-bottom: 2px solid #334155; margin-bottom: 15px; overflow-x: auto; }}
         .tab-btn {{ background: none; border: none; color: #ef4444; font-size: 14px; font-weight: 600; padding: 10px 14px; cursor: pointer; white-space: nowrap; }}
         .tab-btn.active {{ font-weight: 700; border-bottom: 3px solid #ef4444; }}
+        .sub-tab-bar {{ display: flex; gap: 8px; margin-bottom: 12px; }}
+        .sub-tab-btn {{ background: #1e293b; border: 1px solid #475569; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: 600; }}
+        .sub-tab-btn.active {{ background: #3b82f6; color: #ffffff; border-color: #3b82f6; }}
         .table-wrapper {{ width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; border-radius: 4px; }}
         .custom-table {{ width: 100%; border-collapse: collapse; font-family: Calibri, sans-serif; background-color: #ffffff; color: #000000; font-size: 13.5px; }}
         .custom-table th, .custom-table td {{ border: 1px solid #d3d3d3; padding: 6px 8px; text-align: center; white-space: nowrap; }}
@@ -645,7 +648,7 @@ def build_offline_html_bundle():
 <body>
     <div id="loginSection" class="login-box">
         <h2 style="text-align: center; margin-top: 0; font-size: 22px;">WB Sale Data</h2>
-        <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px;">100% Offline Standalone App</p>
+        <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px;">100% In-Memory Offline App</p>
         <div style="margin-bottom: 12px;"><label>User ID</label><input type="text" id="loginUser" placeholder="Enter User ID"></div>
         <div style="margin-bottom: 20px;"><label>Password</label><input type="password" id="loginPass" placeholder="Enter Password"></div>
         <button class="btn btn-blue" style="width: 100%;" onclick="handleLogin()">Sign In</button>
@@ -656,7 +659,7 @@ def build_offline_html_bundle():
         <div class="header-bar">
             <div>
                 <h3 style="margin: 0; font-size: 22px;">WB Sale Data</h3>
-                <span style="font-size: 12px; font-weight: bold; color: #f59e0b;">○ Offline Mode Active (Zero Network Required)</span>
+                <span style="font-size: 12px; font-weight: bold; color: #f59e0b;">○ In-Memory Mode (Zero Network & No Local File Storage)</span>
             </div>
             <div style="display: flex; gap: 15px; align-items: center;">
                 <div class="user-badge" id="userBadge"></div>
@@ -676,18 +679,46 @@ def build_offline_html_bundle():
         <div class="tab-bar">
             <button class="tab-btn active" onclick="switchMainTab('tabVol')">📦 Volume</button>
             <button class="tab-btn" onclick="switchMainTab('tabMS')">📈 Ms%</button>
+            <button class="tab-btn" onclick="switchMainTab('tabDash')">📊 Dashboard</button>
             <button class="tab-btn" onclick="switchMainTab('tabAsk')">💬 Ask Assistant</button>
         </div>
         <div id="tabVol"><div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div></div>
         <div id="tabMS" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div></div>
+        <div id="tabDash" style="display: none;">
+            <div class="sub-tab-bar">
+                <button class="sub-tab-btn active" onclick="switchSubTab('subTarget')">Target vs Ach</button>
+                <button class="sub-tab-btn" onclick="switchSubTab('subMSDet')">MS% Details</button>
+                <button class="sub-tab-btn" onclick="switchSubTab('subWOD')">WOD Details</button>
+            </div>
+            <div id="subTarget"><div class="table-wrapper"><table class="custom-table" id="tableH1"></table></div></div>
+            <div id="subMSDet" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableH2"></table></div></div>
+            <div id="subWOD" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableH3"></table></div></div>
+        </div>
         <div id="tabAsk" style="display: none;">
             <div class="card">
-                <label>Choose a Query:</label>
-                <select id="askQuery" onchange="runAskAssistant()">
-                    <option>Deluxe Industry >= 30 CS but IBDC Not Billed</option>
-                    <option>Semi Premium Whisky Industry >= 50 CS but MHW Not Billed</option>
-                    <option>TIL Non Billed Outlets</option>
-                </select>
+                <div class="grid-filters">
+                    <div>
+                        <label>Choose a Query / Analysis:</label>
+                        <select id="askQuery" onchange="runAskAssistant()">
+                            <option>Deluxe Industry >= 30 CS but IBDC Not Billed</option>
+                            <option>Semi Premium Whisky Industry >= 50 CS but MHW Not Billed</option>
+                            <option>TIL Non Billed Outlets</option>
+                            <option>Magic Moments Billed but BLG Not Billed</option>
+                            <option>MCD Lux Billed but IBDC Not Billed</option>
+                            <option>IQ Billed but IBDC Not Billed</option>
+                            <option>RSW Billed but MHW Not Billed</option>
+                            <option>RGW Billed but MHW Not Billed</option>
+                            <option>SRB7 Billed but MHW Not Billed</option>
+                            <option>RCW Billed but MHW Not Billed</option>
+                            <option>All Season Billed but MHW Not Billed</option>
+                            <option>SMG + SMGP Lapsed Outlets (Not Repeated)</option>
+                            <option>SIW Lapsed Outlets (Not Repeated)</option>
+                            <option>Brand-wise L3M Daily Run vs Current Month Daily Run</option>
+                            <option>Deluxe Industry - MS% Trend (6 Months)</option>
+                            <option>Semi Premium Whisky Industry - MS% Trend (6 Months)</option>
+                        </select>
+                    </div>
+                </div>
             </div>
             <div class="table-wrapper"><table class="custom-table" id="askTable"></table></div>
         </div>
@@ -822,6 +853,7 @@ def build_offline_html_bundle():
             const data = getFilteredData();
             renderVol(data);
             renderMS(data);
+            renderHierarchy(data);
             runAskAssistant();
         }}
 
@@ -847,7 +879,7 @@ def build_offline_html_bundle():
                     if (isM) gtBAL += (tgt - tm);
 
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt).toLocaleString()}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal).toLocaleString():''}}</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal).toLocaleString():''}}</td></tr>`;
                 }});
 
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
@@ -889,6 +921,29 @@ def build_offline_html_bundle():
             document.getElementById('bodyMS').innerHTML = html;
         }}
 
+        function renderHierarchy(data) {{
+            const zones = [...new Set(data.map(d => d.zone).filter(Boolean))];
+            let h1 = `<thead><tr><th rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr>
+                      <tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>`;
+            
+            zones.forEach(z => {{
+                const zData = data.filter(d => d.zone === z);
+                const iLM = zData.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+toNum(c.lm), 0);
+                const iTGT = zData.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+toNum(c.tgt), 0);
+                const iTM = zData.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+toNum(c.tm), 0);
+                const mLM = zData.filter(d => d.brand === 'MHW').reduce((a,c)=>a+toNum(c.lm), 0);
+                const mTGT = zData.filter(d => d.brand === 'MHW').reduce((a,c)=>a+toNum(c.tgt), 0);
+                const mTM = zData.filter(d => d.brand === 'MHW').reduce((a,c)=>a+toNum(c.tm), 0);
+
+                h1 += `<tr class="subtotal-row"><td><b>${{z}}</b></td>
+                    <td>${{Math.round(iLM)}}</td><td>${{Math.round(iTGT)}}</td><td>${{Math.round(iTM)}}</td><td>-</td>
+                    <td>${{Math.round(mLM)}}</td><td>${{Math.round(mTGT)}}</td><td>${{Math.round(mTM)}}</td><td>-</td></tr>`;
+            }});
+            document.getElementById('tableH1').innerHTML = h1 + '</tbody>';
+            document.getElementById('tableH2').innerHTML = h1 + '</tbody>';
+            document.getElementById('tableH3').innerHTML = h1 + '</tbody>';
+        }}
+
         function runAskAssistant() {{
             const q = document.getElementById('askQuery').value;
             const data = getFilteredData();
@@ -928,7 +983,14 @@ def build_offline_html_bundle():
 
         function switchMainTab(id) {{
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            ['tabVol','tabMS','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            ['tabVol','tabMS','tabDash','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            document.getElementById(id).style.display = 'block';
+            event.target.classList.add('active');
+        }}
+
+        function switchSubTab(id) {{
+            document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            ['subTarget','subMSDet','subWOD'].forEach(t => document.getElementById(t).style.display = 'none');
             document.getElementById(id).style.display = 'block';
             event.target.classList.add('active');
         }}
@@ -937,7 +999,7 @@ def build_offline_html_bundle():
 </html>"""
     return html_template
 
-# --- SIDEBAR WITH OFFLINE APP DOWNLOAD ---
+# --- SIDEBAR WITH INSTANT IN-MEMORY OFFLINE LAUNCHER ---
 st.sidebar.markdown("📁 **Data Source**")
 st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
 
@@ -948,14 +1010,31 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("⚡ **Offline Capabilities**")
 
-offline_html_data = build_offline_html_bundle()
-st.sidebar.download_button(
-    label="📲 Download Offline App (PWA)",
-    data=offline_html_data,
-    file_name="WB_Sale_Offline.html",
-    mime="text/html",
-    help="Download this file once to your phone or laptop. Open it anytime to use the dashboard without an internet connection!"
-)
+# Generate In-Memory Standalone Blob Launcher (No local storage or downloading required)
+offline_html_raw = build_offline_html_bundle()
+b64_encoded_html = base64.b64encode(offline_html_raw.encode("utf-8")).decode("utf-8")
+
+launch_offline_js_btn = f"""
+<a href="data:text/html;base64,{b64_encoded_html}" target="_blank" style="text-decoration: none;">
+    <button style="
+        width: 100%;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        font-family: Calibri, sans-serif;
+        font-size: 13.5px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    ">
+        🚀 Launch Offline Mode (New Tab)
+    </button>
+</a>
+"""
+st.sidebar.markdown(launch_offline_js_btn, unsafe_allow_html=True)
+st.sidebar.caption("💡 *Opens instantly in a new tab. Works 100% offline with zero files stored on your disk.*")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
@@ -1214,7 +1293,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -1248,7 +1327,7 @@ def generate_hierarchy_table_1(df):
                 t_ms_m, _, _ = calc_ms_brand(t_df, "MHW")
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{ms_ibdc:.1f}%</td>'
+                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
                 html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
@@ -1640,10 +1719,8 @@ with main_tab4:
             if is_ms:
                 ind_sum = ind_sub["Value"].sum()
                 html_trend += '<td>100.0%</td>' if ind_sum > 0 else '<td>0.0%</td>'
-            elif is_vol:
-                html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
-            elif is_wod:
-                html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+            elif is_vol: html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
+            elif is_wod: html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
         html_trend += '</tr>'
         for b in brand_list:
             html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
@@ -1657,10 +1734,8 @@ with main_tab4:
                     b_tot = b_sub["Value"].sum()
                     ms_pct = (b_tot / ind_tot * 100) if ind_tot > 0 else 0.0
                     html_trend += f'<td>{ms_pct:.1f}%</td>'
-                elif is_vol:
-                    html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
-                elif is_wod:
-                    html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+                elif is_vol: html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
+                elif is_wod: html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
             html_trend += '</tr>'
         html_trend += '</tbody></table></div>'
         st.markdown(f"#### 📈 {query_type}:")
