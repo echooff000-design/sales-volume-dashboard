@@ -572,7 +572,7 @@ for c in ["This Month", "Last Month", "Target"]:
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (ALL FEATURES INCLUDED) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (100% IDENTICAL HIERARCHY & FEATURES) ---
 def build_offline_html_bundle():
     records_export = []
     
@@ -714,9 +714,6 @@ def build_offline_html_bundle():
                             <option>All Season Billed but MHW Not Billed</option>
                             <option>SMG + SMGP Lapsed Outlets (Not Repeated)</option>
                             <option>SIW Lapsed Outlets (Not Repeated)</option>
-                            <option>Brand-wise L3M Daily Run vs Current Month Daily Run</option>
-                            <option>Deluxe Industry - MS% Trend (6 Months)</option>
-                            <option>Semi Premium Whisky Industry - MS% Trend (6 Months)</option>
                         </select>
                     </div>
                 </div>
@@ -739,6 +736,8 @@ def build_offline_html_bundle():
             {{ seg: "Single Malt-Scotch", brands: ["SIW"] }}
         ];
         const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
+        const H2_BRANDS = ["IBDC", "MCD Lux", "IQ", "N1WSUP", "OCBL", "RSW", "SRB7", "RGW", "MHW"];
+        const H3_BRANDS = ["IBDC", "MCD Lux", "IQ", "MHW"];
 
         function toNum(v) {{
             const n = parseFloat(v);
@@ -796,7 +795,7 @@ def build_offline_html_bundle():
 
         function onGroupChange() {{
             const scope = getScopedRecords(1);
-            const asms = [...new Set(scope.map(d => d.asm).filter(Boolean))].sort();
+            const asms = sortAsms([...new Set(scope.map(d => d.asm).filter(Boolean))]);
             setSelectOptions('selASM', asms, false);
             onASMChange();
         }}
@@ -833,6 +832,13 @@ def build_offline_html_bundle():
             updateDashboard();
         }}
 
+        function sortAsms(asmList) {{
+            const valid = asmList.filter(a => a && a.toLowerCase() !== 'nan');
+            const normal = valid.filter(a => a.trim().toLowerCase() !== 'key accounts').sort();
+            const ka = valid.filter(a => a.trim().toLowerCase() === 'key accounts');
+            return normal.concat(ka);
+        }}
+
         function getFilteredData() {{
             const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
             const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
@@ -854,7 +860,7 @@ def build_offline_html_bundle():
             const data = getFilteredData();
             renderVol(data);
             renderMS(data);
-            renderHierarchy(data);
+            renderHierarchyFull(data);
             runAskAssistant();
         }}
 
@@ -880,13 +886,13 @@ def build_offline_html_bundle():
                     if (isM) gtBAL += (tgt - tm);
 
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt).toLocaleString()}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal).toLocaleString():''}}</td></tr>`;
                 }});
 
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
             }});
 
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL).toLocaleString()}}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
         }}
 
@@ -922,63 +928,208 @@ def build_offline_html_bundle():
             document.getElementById('bodyMS').innerHTML = html;
         }}
 
-        function renderHierarchy(data) {{
-            const zones = [...new Set(data.map(d => d.zone).filter(Boolean))];
-            let h1 = `<thead><tr><th rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr>
-                      <tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>`;
+        function calcMSBrand(sub, b) {{
+            const segs = b === 'MHW' ? ['Semi Premium-Whisky'] : ['Deluxe-Whisky', 'Deluxe Plus-Whisky'];
+            const bLM = sub.filter(d => d.brand === b).reduce((a,c)=>a + toNum(c.lm), 0);
+            const bTM = sub.filter(d => d.brand === b).reduce((a,c)=>a + toNum(c.tm), 0);
+            const dLM = sub.filter(d => segs.includes(d.seg)).reduce((a,c)=>a + toNum(c.lm), 0);
+            const dTM = sub.filter(d => segs.includes(d.seg)).reduce((a,c)=>a + toNum(c.tm), 0);
+            const lmPct = dLM > 0 ? (bLM / dLM * 100) : 0;
+            const tmPct = dTM > 0 ? (bTM / dTM * 100) : 0;
+            return {{ lm: lmPct, tm: tmPct, diff: tmPct - lmPct }};
+        }}
+
+        function renderHierarchyFull(data) {{
+            // 1. Table H1 (Target vs Ach)
+            let h1 = '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr><tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>';
             
+            const iLM_T = data.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
+            const iTGT_T = data.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
+            const iTM_T = data.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
+            const iMS_T = calcMSBrand(data, 'IBDC').tm;
+
+            const mLM_T = data.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.lm),0);
+            const mTGT_T = data.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tgt),0);
+            const mTM_T = data.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tm),0);
+            const mMS_T = calcMSBrand(data, 'MHW').tm;
+
+            h1 += `<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td><td>${{Math.round(iLM_T).toLocaleString()}}</td><td>${{Math.round(iTGT_T).toLocaleString()}}</td><td>${{Math.round(iTM_T).toLocaleString()}}</td><td>${{iMS_T.toFixed(1)}}%</td><td>${{Math.round(mLM_T).toLocaleString()}}</td><td>${{Math.round(mTGT_T).toLocaleString()}}</td><td>${{Math.round(mTM_T).toLocaleString()}}</td><td>${{mMS_T.toFixed(1)}}%</td></tr>`;
+
+            // 2. Table H2 (MS% Details)
+            let h2 = '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>';
+            H2_BRANDS.forEach(b => h2 += `<th colspan="3">${{b}}</th>`);
+            h2 += '</tr><tr>';
+            H2_BRANDS.forEach(() => h2 += '<th>LM</th><th>MTD</th><th>diff</th>');
+            h2 += '</tr></thead><tbody>';
+
+            h2 += `<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>`;
+            H2_BRANDS.forEach(b => {{
+                const r = calcMSBrand(data, b);
+                h2 += `<td>${{r.lm.toFixed(1)}}%</td><td>${{r.tm.toFixed(1)}}%</td><td style="color:${{r.diff<0?'#9b1c1c':'#03543f'}}">${{r.diff>0?'+':''}}${{r.diff.toFixed(1)}}%</td>`;
+            }});
+            h2 += '</tr>';
+
+            // 3. Table H3 (WOD Unique Outlets)
+            let h3 = '<thead><tr><th class="seg-col-text" rowspan="2">Unique Billing Outlet<br>ZONE/ASM/TSE</th>';
+            H3_BRANDS.forEach(b => h3 += `<th colspan="3">${{b}}</th>`);
+            h3 += '</tr><tr>';
+            H3_BRANDS.forEach(() => h3 += '<th>LM</th><th>MTD</th><th>diff</th>');
+            h3 += '</tr></thead><tbody>';
+
+            h3 += `<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>`;
+            H3_BRANDS.forEach(b => {{
+                const lmCnt = new Set(data.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
+                const tmCnt = new Set(data.filter(d=>d.brand===b && toNum(d.tm)>0).map(d=>d.lic)).size;
+                const diff = tmCnt - lmCnt;
+                h3 += `<td>${{lmCnt.toLocaleString()}}</td><td>${{tmCnt.toLocaleString()}}</td><td style="color:${{diff<0?'#9b1c1c':'#03543f'}}">${{diff>0?'+':''}}${{diff}}</td>`;
+            }});
+            h3 += '</tr>';
+
+            // Zone -> ASM -> TSE Nesting for H1, H2, H3
+            const zones = [...new Set(data.map(d => d.zone).filter(Boolean))].sort();
             zones.forEach(z => {{
                 const zData = data.filter(d => d.zone === z);
-                const iLM = zData.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+toNum(c.lm), 0);
-                const iTGT = zData.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+toNum(c.tgt), 0);
-                const iTM = zData.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+toNum(c.tm), 0);
-                const mLM = zData.filter(d => d.brand === 'MHW').reduce((a,c)=>a+toNum(c.lm), 0);
-                const mTGT = zData.filter(d => d.brand === 'MHW').reduce((a,c)=>a+toNum(c.tgt), 0);
-                const mTM = zData.filter(d => d.brand === 'MHW').reduce((a,c)=>a+toNum(c.tm), 0);
 
-                h1 += `<tr class="subtotal-row"><td><b>${{z}}</b></td>
-                    <td>${{Math.round(iLM)}}</td><td>${{Math.round(iTGT)}}</td><td>${{Math.round(iTM)}}</td><td>-</td>
-                    <td>${{Math.round(mLM)}}</td><td>${{Math.round(mTGT)}}</td><td>${{Math.round(mTM)}}</td><td>-</td></tr>`;
+                // H1 Zone
+                const ziLM = zData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
+                const ziTGT = zData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
+                const ziTM = zData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
+                const ziMS = calcMSBrand(zData, 'IBDC').tm;
+                const zmLM = zData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.lm),0);
+                const zmTGT = zData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tgt),0);
+                const zmTM = zData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tm),0);
+                const zmMS = calcMSBrand(zData, 'MHW').tm;
+                h1 += `<tr class="subtotal-row"><td class="seg-col-text"><b>${{z}}</b></td><td>${{Math.round(ziLM).toLocaleString()}}</td><td>${{Math.round(ziTGT).toLocaleString()}}</td><td>${{Math.round(ziTM).toLocaleString()}}</td><td>${{ziMS.toFixed(1)}}%</td><td>${{Math.round(zmLM).toLocaleString()}}</td><td>${{Math.round(zmTGT).toLocaleString()}}</td><td>${{Math.round(zmTM).toLocaleString()}}</td><td>${{zmMS.toFixed(1)}}%</td></tr>`;
+
+                // H2 Zone
+                h2 += `<tr class="subtotal-row"><td class="seg-col-text"><b>${{z}}</b></td>`;
+                H2_BRANDS.forEach(b => {{
+                    const r = calcMSBrand(zData, b);
+                    h2 += `<td>${{r.lm.toFixed(1)}}%</td><td>${{r.tm.toFixed(1)}}%</td><td style="color:${{r.diff<0?'#9b1c1c':'#03543f'}}">${{r.diff>0?'+':''}}${{r.diff.toFixed(1)}}%</td>`;
+                }});
+                h2 += '</tr>';
+
+                // H3 Zone
+                h3 += `<tr class="subtotal-row"><td class="seg-col-text"><b>${{z}}</b></td>`;
+                H3_BRANDS.forEach(b => {{
+                    const lmCnt = new Set(zData.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
+                    const tmCnt = new Set(zData.filter(d=>d.brand===b && toNum(d.tm)>0).map(d=>d.lic)).size;
+                    const diff = tmCnt - lmCnt;
+                    h3 += `<td>${{lmCnt.toLocaleString()}}</td><td>${{tmCnt.toLocaleString()}}</td><td style="color:${{diff<0?'#9b1c1c':'#03543f'}}">${{diff>0?'+':''}}${{diff}}</td>`;
+                }});
+                h3 += '</tr>';
+
+                const asms = sortAsms([...new Set(zData.map(d => d.asm).filter(Boolean))]);
+                asms.forEach(asm => {{
+                    const aData = zData.filter(d => d.asm === asm);
+
+                    // H1 ASM
+                    const aiLM = aData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
+                    const aiTGT = aData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
+                    const aiTM = aData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
+                    const aiMS = calcMSBrand(aData, 'IBDC').tm;
+                    const amLM = aData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.lm),0);
+                    const amTGT = aData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tgt),0);
+                    const amTM = aData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tm),0);
+                    const amMS = calcMSBrand(aData, 'MHW').tm;
+                    h1 += `<tr class="subtotal-row"><td class="seg-col-text" style="padding-left:14px;"><b>${{asm}}</b></td><td>${{Math.round(aiLM).toLocaleString()}}</td><td>${{Math.round(aiTGT).toLocaleString()}}</td><td>${{Math.round(aiTM).toLocaleString()}}</td><td>${{aiMS.toFixed(1)}}%</td><td>${{Math.round(amLM).toLocaleString()}}</td><td>${{Math.round(amTGT).toLocaleString()}}</td><td>${{Math.round(amTM).toLocaleString()}}</td><td>${{amMS.toFixed(1)}}%</td></tr>`;
+
+                    // H2 ASM
+                    h2 += `<tr class="subtotal-row"><td class="seg-col-text" style="padding-left:14px;"><b>${{asm}}</b></td>`;
+                    H2_BRANDS.forEach(b => {{
+                        const r = calcMSBrand(aData, b);
+                        h2 += `<td>${{r.lm.toFixed(1)}}%</td><td>${{r.tm.toFixed(1)}}%</td><td style="color:${{r.diff<0?'#9b1c1c':'#03543f'}}">${{r.diff>0?'+':''}}${{r.diff.toFixed(1)}}%</td>`;
+                    }});
+                    h2 += '</tr>';
+
+                    // H3 ASM
+                    h3 += `<tr class="subtotal-row"><td class="seg-col-text" style="padding-left:14px;"><b>${{asm}}</b></td>`;
+                    H3_BRANDS.forEach(b => {{
+                        const lmCnt = new Set(aData.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
+                        const tmCnt = new Set(aData.filter(d=>d.brand===b && toNum(d.tm)>0).map(d=>d.lic)).size;
+                        const diff = tmCnt - lmCnt;
+                        h3 += `<td>${{lmCnt.toLocaleString()}}</td><td>${{tmCnt.toLocaleString()}}</td><td style="color:${{diff<0?'#9b1c1c':'#03543f'}}">${{diff>0?'+':''}}${{diff}}</td>`;
+                    }});
+                    h3 += '</tr>';
+
+                    const tses = [...new Set(aData.map(d => d.tse).filter(Boolean))].sort();
+                    tses.forEach(tse => {{
+                        const tData = aData.filter(d => d.tse === tse);
+
+                        // H1 TSE
+                        const tiLM = tData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
+                        const tiTGT = tData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
+                        const tiTM = tData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
+                        const tiMS = calcMSBrand(tData, 'IBDC').tm;
+                        const tmLM = tData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.lm),0);
+                        const tmTGT = tData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tgt),0);
+                        const tmTM = tData.filter(d=>d.brand==='MHW').reduce((a,c)=>a+toNum(c.tm),0);
+                        const tmMS = calcMSBrand(tData, 'MHW').tm;
+                        h1 += `<tr class="brand-row"><td class="brand-col-text" style="padding-left:26px;">${{tse}}</td><td>${{Math.round(tiLM).toLocaleString()}}</td><td>${{Math.round(tiTGT).toLocaleString()}}</td><td>${{Math.round(tiTM).toLocaleString()}}</td><td>${{tiMS.toFixed(1)}}%</td><td>${{Math.round(tmLM).toLocaleString()}}</td><td>${{Math.round(tmTGT).toLocaleString()}}</td><td>${{Math.round(tmTM).toLocaleString()}}</td><td>${{tmMS.toFixed(1)}}%</td></tr>`;
+
+                        // H2 TSE
+                        h2 += `<tr class="brand-row"><td class="brand-col-text" style="padding-left:26px;">${{tse}}</td>`;
+                        H2_BRANDS.forEach(b => {{
+                            const r = calcMSBrand(tData, b);
+                            h2 += `<td>${{r.lm.toFixed(1)}}%</td><td>${{r.tm.toFixed(1)}}%</td><td style="color:${{r.diff<0?'#9b1c1c':'#03543f'}}">${{r.diff>0?'+':''}}${{r.diff.toFixed(1)}}%</td>`;
+                        }});
+                        h2 += '</tr>';
+
+                        // H3 TSE
+                        h3 += `<tr class="brand-row"><td class="brand-col-text" style="padding-left:26px;">${{tse}}</td>`;
+                        H3_BRANDS.forEach(b => {{
+                            const lmCnt = new Set(tData.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
+                            const tmCnt = new Set(tData.filter(d=>d.brand===b && toNum(d.tm)>0).map(d=>d.lic)).size;
+                            const diff = tmCnt - lmCnt;
+                            h3 += `<td>${{lmCnt.toLocaleString()}}</td><td>${{tmCnt.toLocaleString()}}</td><td style="color:${{diff<0?'#9b1c1c':'#03543f'}}">${{diff>0?'+':''}}${{diff}}</td>`;
+                        }});
+                        h3 += '</tr>';
+                    }});
+                }});
             }});
+
             document.getElementById('tableH1').innerHTML = h1 + '</tbody>';
-            document.getElementById('tableH2').innerHTML = h1 + '</tbody>';
-            document.getElementById('tableH3').innerHTML = h1 + '</tbody>';
+            document.getElementById('tableH2').innerHTML = h2 + '</tbody>';
+            document.getElementById('tableH3').innerHTML = h3 + '</tbody>';
         }}
 
         function runAskAssistant() {{
             const q = document.getElementById('askQuery').value;
             const data = getFilteredData();
             const uniqueOutlets = [...new Set(data.map(d => d.outlet).filter(Boolean))].sort();
-            let html = `<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>`;
+            let html = '<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>';
             let cnt = 0;
 
             uniqueOutlets.forEach(out => {{
                 const rows = data.filter(d => d.outlet === out);
+                let isMatch = false, metricVal = 0;
+
                 if (q.includes("Deluxe Industry >=")) {{
                     const dVol = rows.filter(d => d.seg && d.seg.includes('Deluxe')).reduce((a,c)=>a + toNum(c.tm), 0);
                     const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
-                    if (dVol >= 30 && iVol === 0) {{
-                        cnt++;
-                        html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`;
-                    }}
+                    if (dVol >= 30 && iVol === 0) {{ isMatch = true; metricVal = dVol; }}
                 }} else if (q.includes("Semi Premium Whisky Industry >=")) {{
                     const sVol = rows.filter(d => d.seg === 'Semi Premium-Whisky').reduce((a,c)=>a + toNum(c.tm), 0);
                     const mVol = rows.filter(d => d.brand === 'MHW').reduce((a,c)=>a + toNum(c.tm), 0);
-                    if (sVol >= 50 && mVol === 0) {{
-                        cnt++;
-                        html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(sVol)}}</b></td></tr>`;
-                    }}
+                    if (sVol >= 50 && mVol === 0) {{ isMatch = true; metricVal = sVol; }}
+                }} else if (q.includes("TIL Non Billed")) {{
+                    const totLM = rows.reduce((a,c)=>a + toNum(c.lm), 0);
+                    const iVol = rows.filter(d => ['IBDC', 'MHW', 'BLGLM', 'BLGOR'].includes(d.brand)).reduce((a,c)=>a + toNum(c.tm), 0);
+                    if (totLM > 0 && iVol === 0) {{ isMatch = true; metricVal = totLM; }}
                 }} else {{
-                    const bVol = rows.reduce((a,c)=>a + toNum(c.lm), 0);
-                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
-                    if (bVol > 0 && iVol === 0) {{
-                        cnt++;
-                        html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(bVol)}}</b></td></tr>`;
-                    }}
+                    const drv = q.split(' Billed')[0];
+                    const drvVol = rows.filter(d => d.brand === drv).reduce((a,c)=>a + toNum(c.lm), 0);
+                    const tgtVol = rows.filter(d => d.brand === (q.includes('MHW') ? 'MHW' : 'IBDC')).reduce((a,c)=>a + toNum(c.tm), 0);
+                    if (drvVol > 0 && tgtVol === 0) {{ isMatch = true; metricVal = drvVol; }}
+                }}
+
+                if (isMatch) {{
+                    cnt++;
+                    html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(metricVal)}}</b></td></tr>`;
                 }}
             }});
 
-            if (!cnt) html += `<tr><td colspan="5">🎉 No gap outlets found!</td></tr>`;
+            if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>';
             document.getElementById('askTable').innerHTML = html + '</tbody>';
         }}
 
@@ -1016,17 +1167,17 @@ offline_html_raw = build_offline_html_bundle()
 b64_encoded_html = base64.b64encode(offline_html_raw.encode("utf-8")).decode("utf-8")
 
 launch_offline_btn = f"""
-<div style="width: 100%;">
+<div style="width: 100%; margin: 0; padding: 0;">
     <button onclick="launchOfflineTab()" style="
         width: 100%;
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
-        padding: 10px 14px;
+        padding: 9px 12px;
         border-radius: 8px;
         border: none;
         font-weight: 600;
         font-family: Calibri, sans-serif;
-        font-size: 13.5px;
+        font-size: 13px;
         cursor: pointer;
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
     ">
@@ -1053,8 +1204,9 @@ function launchOfflineTab() {{
 }}
 </script>
 """
-components.html(launch_offline_btn, height=55)
-st.sidebar.caption("💡 *Opens in a new tab. Works 100% offline with zero files stored on disk.*")
+with st.sidebar:
+    components.html(launch_offline_btn, height=45)
+    st.caption("💡 *Opens in a new tab. Works 100% offline with zero files stored on disk.*")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
@@ -1330,7 +1482,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_i:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
