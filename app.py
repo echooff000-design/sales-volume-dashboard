@@ -1493,7 +1493,7 @@ with main_tab4:
         html_trend += '</tr>'
         
         for b in brand_list:
-            html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
+            html_trend += f'<tr class="brand-row"><td class="seg-col-text">{b}</td>'
             for m_key in trend_months:
                 m_df = months_dict[m_key]
                 if m_df.empty:
