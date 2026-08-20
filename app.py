@@ -6,6 +6,7 @@ import datetime
 import os
 import base64
 import re
+import json
 import extra_streamlit_components as stx
 import gspread
 from google.oauth2.service_account import Credentials
@@ -171,14 +172,12 @@ cookie_manager = get_manager()
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 def get_current_session_cycle_date(now_ist):
-    """Determines the current active cycle date anchored at 12:02 AM IST."""
     cutoff_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
     if now_ist < cutoff_today:
         return (now_ist.date() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     return now_ist.date().strftime("%Y-%m-%d")
 
 def get_seconds_until_next_1202_am(now_ist):
-    """Calculates remaining seconds until next 12:02:00 AM IST."""
     target_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
     if now_ist < target_today:
         next_cutoff = target_today
@@ -289,10 +288,8 @@ def extract_f2_date(df_u):
 
 days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
 
-# --- STRICT POSITIONAL & ROBUST NAME/USER_ID EXTRACTION ---
-# Col A (idx 0) = Name | Col B (idx 1) = user_id | Col C (idx 2) = password | Col D (idx 3) = role
+# Strict Positional Extraction (Col A = Name, Col B = user_id, Col C = password, Col D = role)
 df_users = raw_users_df.copy()
-
 name_idx = 0
 user_idx = 1 if df_users.shape[1] > 1 else 0
 pass_idx = 2 if df_users.shape[1] > 2 else 0
@@ -316,7 +313,6 @@ df_users_clean = pd.DataFrame({
     "role": df_users.iloc[:, role_idx].astype(str).str.strip() if role_idx is not None else "User"
 })
 
-# --- 12:02 AM IST LOGOUT VALIDATION ---
 now_ist = datetime.datetime.now(IST)
 active_cycle_date = get_current_session_cycle_date(now_ist)
 
@@ -331,7 +327,6 @@ try:
 except Exception:
     pass
 
-# Expire session if from previous day cycle (crossed 12:02 AM IST)
 if cached_user_val and cached_user_cycle != active_cycle_date:
     try:
         cookie_manager.delete("wb_sale_user")
@@ -360,7 +355,6 @@ if "authenticated" not in st.session_state:
         st.session_state["session_cycle"] = ""
         st.session_state["is_admin"] = False
 
-# Live in-session 12:02 AM boundary check
 if st.session_state.get("authenticated", False):
     if st.session_state.get("session_cycle") != active_cycle_date:
         try:
@@ -371,7 +365,6 @@ if st.session_state.get("authenticated", False):
         st.session_state.update({"authenticated": False, "user_name": "", "session_cycle": "", "is_admin": False})
         st.rerun()
 
-# Auto-purge corrupted 'nan' session
 if st.session_state.get("authenticated", False) and str(st.session_state.get("user_name", "")).strip().lower() in ["nan", "none", ""]:
     try:
         cookie_manager.delete("wb_sale_user")
@@ -449,7 +442,6 @@ if not st.session_state["authenticated"]:
                     except Exception:
                         pass
                     
-                    # --- GOOGLE SHEETS BACKGROUND LOGGER (NAME IN COL D, USER ID IN COL E) ---
                     try:
                         sheet = get_sheet()
                         now_log = datetime.datetime.now(IST)
@@ -516,46 +508,7 @@ with col_logout:
         st.session_state.update({"authenticated": False, "user_name": "", "session_cycle": "", "is_admin": False})
         st.rerun()
 
-# --- SIDEBAR WITH DYNAMIC USER F2 DATE ---
-st.sidebar.markdown("📁 **Data Source**")
-st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
-
-if st.sidebar.button("🔄 Refresh Data Now"):
-    st.cache_data.clear()
-    st.sidebar.success("Cache cleared! Fetching newest data...")
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("📋 **Admin Panel**")
-
-# --- CONDITIONAL ADMIN LOG DOWNLOAD ---
-if st.session_state.get("is_admin", False):
-    try:
-        sheet = get_sheet()
-        all_rows = sheet.get_all_values()
-        
-        if len(all_rows) > 1:
-            headers = all_rows[0]
-            rows = all_rows[1:]
-            df_logs = pd.DataFrame(rows, columns=headers)
-            csv_logs = df_logs.to_csv(index=False).encode('utf-8')
-            st.sidebar.download_button(
-                label="📥 Download Google Sheet Logs",
-                data=csv_logs,
-                file_name="wb_login_logs.csv",
-                mime="text/csv"
-            )
-        else:
-            st.sidebar.info("ℹ️ Google Sheet connected. No logins recorded yet.")
-    except Exception as e:
-        err_msg = str(e).strip() if str(e).strip() else repr(e)
-        st.sidebar.error(f"⚠️ Log Connection Error: {err_msg}")
-else:
-    st.sidebar.info("Logs are saved securely in Google Sheets.")
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("🔗 **[Go to FTS Calculator](https://wbftscalculator.streamlit.app/)**")
-
-# --- 7. FETCH DATA FROM SHEETS ---
+# --- 7. PROCESS SHEETS & MASTER DATA ---
 required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
 for sheet in required_sheets:
     if sheet not in dfs:
@@ -567,7 +520,6 @@ df_last = dfs["Last Month"].copy()
 df_target = dfs["Target Data"].copy()
 df_outlet = dfs["Outlet Master"].copy()
 
-# --- PROCESS OUTLET MASTER FOR MAPPINGS ---
 df_outlet.columns = df_outlet.columns.astype(str).str.strip()
 if "Outlet Nan" in df_outlet.columns:
     df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
@@ -640,6 +592,293 @@ df_raw = pd.pivot_table(
 
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
+
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER ---
+def build_offline_html_bundle():
+    records_export = []
+    for _, row in df_raw.iterrows():
+        records_export.append({
+            "lic": str(row.get("LIC No", "")).strip(),
+            "outlet": str(row.get("Outlet Name", "")).strip(),
+            "group": str(row.get("Group", "Unassigned")).strip(),
+            "zone": str(row.get("Zone", "West Bengal")).strip(),
+            "asm": str(row.get("ASM", "Unassigned")).strip(),
+            "tse": str(row.get("TSE", "Unassigned")).strip(),
+            "seg": str(row.get("Segment", "Deluxe-Whisky")).strip(),
+            "brand": str(row.get("Brand", "")).strip(),
+            "tm": float(row.get("This Month", 0)),
+            "lm": float(row.get("Last Month", 0)),
+            "tgt": float(row.get("Target", 0)),
+            "m2": 0, "m3": 0, "m4": 0, "m5": 0
+        })
+
+    users_export = df_users_clean.to_dict(orient="records")
+    users_json_str = json.dumps(users_export)
+    sales_json_str = json.dumps(records_export)
+
+    html_template = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WB Sale Data (Offline Mode)</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {{ box-sizing: border-box; }}
+        body {{ background-color: #0f172a; color: #f8fafc; font-family: Calibri, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 15px; }}
+        .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 10px; margin-bottom: 15px; }}
+        .user-badge {{ text-align: right; font-size: 13px; color: #f8fafc; }}
+        .user-badge span {{ color: #60a5fa; font-size: 11px; }}
+        .card {{ background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 14px; margin-bottom: 15px; }}
+        .grid-filters {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }}
+        label {{ font-size: 13px; font-weight: 600; color: #f8fafc; display: block; margin-bottom: 4px; }}
+        select, input {{ width: 100%; background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 7px 10px; border-radius: 6px; font-family: Calibri, sans-serif; font-size: 13px; }}
+        .btn {{ background: #1e293b; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.25); padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }}
+        .btn:hover {{ background: #334155; border-color: #3b82f6; }}
+        .btn-blue {{ background: #3b82f6; border-color: #3b82f6; }}
+        .btn-red {{ background: #ef4444; border-color: #ef4444; }}
+        .tab-bar {{ display: flex; gap: 12px; border-bottom: 2px solid #334155; margin-bottom: 15px; overflow-x: auto; }}
+        .tab-btn {{ background: none; border: none; color: #ef4444; font-size: 14px; font-weight: 600; padding: 10px 14px; cursor: pointer; white-space: nowrap; }}
+        .tab-btn.active {{ font-weight: 700; border-bottom: 3px solid #ef4444; }}
+        .table-wrapper {{ width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; border-radius: 4px; }}
+        .custom-table {{ width: 100%; border-collapse: collapse; font-family: Calibri, sans-serif; background-color: #ffffff; color: #000000; font-size: 13.5px; }}
+        .custom-table th, .custom-table td {{ border: 1px solid #d3d3d3; padding: 6px 8px; text-align: center; white-space: nowrap; }}
+        .custom-table th {{ background-color: #D9E1F2; border-bottom: 2px solid #b0b0b0; font-weight: 700; }}
+        .subtotal-row {{ font-weight: bold; background-color: #F2F2F2; text-align: left; }}
+        .brand-row {{ background-color: #FFFFFF; color: #000000; }}
+        .brand-col-text {{ text-align: left; padding-left: 8px; white-space: nowrap; }}
+        .grand-total-row {{ background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 14px; border-top: 2px solid #b0b0b0; }}
+        .highlight-green {{ background-color: #def7ec !important; color: #03543f !important; }}
+        .highlight-red {{ background-color: #fde8e8 !important; color: #9b1c1c !important; }}
+        .marked-brand {{ background-color: #EBF5FB; font-weight: bold; }}
+        .custom-table th:first-child, .custom-table td:first-child {{ position: sticky; left: 0; z-index: 2; background-color: #F2F2F2; border-right: 1px solid #d3d3d3; }}
+        .custom-table th:first-child {{ background-color: #D9E1F2; z-index: 3; }}
+        .login-box {{ max-width: 380px; margin: 50px auto; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); padding: 35px 25px; border-radius: 16px; }}
+    </style>
+</head>
+<body>
+    <div id="loginSection" class="login-box">
+        <h2 style="text-align: center; margin-top: 0; font-size: 22px;">WB Sale Data</h2>
+        <p style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 20px;">100% Offline Standalone PWA</p>
+        <div style="margin-bottom: 12px;"><label>User ID</label><input type="text" id="loginUser" placeholder="Enter User ID"></div>
+        <div style="margin-bottom: 20px;"><label>Password</label><input type="password" id="loginPass" placeholder="Enter Password"></div>
+        <button class="btn btn-blue" style="width: 100%;" onclick="handleLogin()">Sign In</button>
+        <div id="loginError" style="color: #ef4444; font-size: 12px; margin-top: 10px; text-align: center; display: none;">❌ Invalid Credentials</div>
+    </div>
+
+    <div id="mainDashboard" style="display: none;">
+        <div class="header-bar">
+            <div>
+                <h3 style="margin: 0; font-size: 22px;">WB Sale Data</h3>
+                <span style="font-size: 12px; font-weight: bold; color: #f59e0b;">○ Offline Mode Active (Zero Network Required)</span>
+            </div>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div class="user-badge" id="userBadge"></div>
+                <button class="btn btn-red" onclick="handleLogout()">Logout</button>
+            </div>
+        </div>
+        <div class="card">
+            <h4 style="margin: 0 0 10px 0; font-size: 16px;">🔍 Filters</h4>
+            <div class="grid-filters">
+                <div><label>Group</label><select id="selGroup" onchange="onFilterChange()"></select></div>
+                <div><label>ASM</label><select id="selASM" onchange="onFilterChange()"></select></div>
+                <div><label>TSE</label><select id="selTSE" onchange="onFilterChange()"></select></div>
+                <div><label>LIC No</label><select id="selLIC" onchange="onFilterChange()"></select></div>
+                <div><label>Outlet</label><select id="selOutlet" onchange="onFilterChange()"></select></div>
+            </div>
+        </div>
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchMainTab('tabVol')">📦 Volume</button>
+            <button class="tab-btn" onclick="switchMainTab('tabMS')">📈 Ms%</button>
+            <button class="tab-btn" onclick="switchMainTab('tabAsk')">💬 Ask Assistant</button>
+        </div>
+        <div id="tabVol"><div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div></div>
+        <div id="tabMS" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div></div>
+        <div id="tabAsk" style="display: none;">
+            <div class="card">
+                <label>Choose a Query:</label>
+                <select id="askQuery" onchange="runAskAssistant()">
+                    <option>Deluxe Industry >= 30 CS but IBDC Not Billed</option>
+                    <option>Semi Premium Whisky Industry >= 50 CS but MHW Not Billed</option>
+                    <option>TIL Non Billed Outlets</option>
+                </select>
+            </div>
+            <div class="table-wrapper"><table class="custom-table" id="askTable"></table></div>
+        </div>
+    </div>
+
+    <script>
+        const appUsers = {users_json_str};
+        const appSales = {sales_json_str};
+        const SEG_ORDER = ["Deluxe-Whisky", "Semi Premium-Whisky", "Deluxe-Gin", "Premium-Brandy", "Premium-Gin", "Semi Premium-Brandy", "Single Malt-Scotch"];
+        const BRAND_ORDER = ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak", "MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR", "BLGLM", "BLGOR", "Big Ben", "Blue Riband", "Monarch", "SMG", "SMGP", "MHFB", "SIW"];
+        const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
+
+        function handleLogin() {{
+            const u = document.getElementById('loginUser').value.trim().toLowerCase();
+            const p = document.getElementById('loginPass').value.trim();
+            const matched = appUsers.find(x => (x.user_id.toLowerCase() === u || x.Name.toLowerCase() === u) && x.password === p);
+            if (matched) {{
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('mainDashboard').style.display = 'block';
+                document.getElementById('userBadge').innerHTML = `👤 <b>${{matched.Name}}</b><br><span>${{matched.role || 'User'}}</span>`;
+                populateFilters();
+                onFilterChange();
+            }} else {{
+                document.getElementById('loginError').style.display = 'block';
+            }}
+        }}
+
+        function handleLogout() {{
+            document.getElementById('mainDashboard').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+        }}
+
+        function populateFilters() {{
+            const fill = (id, key) => {{
+                const vals = ['All', ...new Set(appSales.map(d => d[key]).filter(Boolean))].sort();
+                document.getElementById(id).innerHTML = vals.map(v => `<option value="${{v}}">${{v}}</option>`).join('');
+            }};
+            fill('selGroup', 'group'); fill('selASM', 'asm'); fill('selTSE', 'tse'); fill('selLIC', 'lic'); fill('selOutlet', 'outlet');
+        }}
+
+        function getFiltered() {{
+            const grp = document.getElementById('selGroup').value;
+            const asm = document.getElementById('selASM').value;
+            const tse = document.getElementById('selTSE').value;
+            const lic = document.getElementById('selLIC').value;
+            const out = document.getElementById('selOutlet').value;
+            return appSales.filter(d => (grp === 'All' || d.group === grp) && (asm === 'All' || d.asm === asm) && (tse === 'All' || d.tse === tse) && (lic === 'All' || d.lic === lic) && (out === 'All' || d.outlet === out));
+        }}
+
+        function onFilterChange() {{
+            const data = getFiltered();
+            renderVol(data); renderMS(data); runAskAssistant();
+        }}
+
+        function renderVol(data) {{
+            let html = '', gtLM = 0, gtTGT = 0, gtTM = 0, gtBAL = 0;
+            SEG_ORDER.forEach(seg => {{
+                const sData = data.filter(d => d.seg === seg);
+                const sLM = sData.reduce((a,c)=>a+c.lm, 0), sTGT = sData.reduce((a,c)=>a+c.tgt, 0), sTM = sData.reduce((a,c)=>a+c.tm, 0);
+                html += `<tr class="subtotal-row"><td>${{seg}}</td><td>${{Math.round(sLM)}}</td><td>${{Math.round(sTGT)}}</td><td>${{Math.round(sTM)}}</td><td></td></tr>`;
+                BRAND_ORDER.filter(b => sData.some(d=>d.brand===b)).forEach(b => {{
+                    const bData = sData.filter(d => d.brand === b);
+                    const lm = bData.reduce((a,c)=>a+c.lm,0), tgt = bData.reduce((a,c)=>a+c.tgt,0), tm = bData.reduce((a,c)=>a+c.tm,0);
+                    const isM = MARKED_BRANDS.includes(b), bal = isM ? (tgt - tm) : '';
+                    if(isM) gtBAL += (tgt - tm);
+                    const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm)}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm)}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
+                }});
+                gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
+            }});
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM)}}</td><td>${{Math.round(gtTGT)}}</td><td>${{Math.round(gtTM)}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
+            document.getElementById('bodyVolume').innerHTML = html;
+        }}
+
+        function renderMS(data) {{
+            let html = '', gtLM = data.reduce((a,c)=>a+c.lm,0)||1, gtTM = data.reduce((a,c)=>a+c.tm,0)||1;
+            SEG_ORDER.forEach(seg => {{
+                const sData = data.filter(d=>d.seg===seg);
+                const sLM = sData.reduce((a,c)=>a+c.lm,0), sTM = sData.reduce((a,c)=>a+c.tm,0);
+                html += `<tr class="subtotal-row"><td>${{seg}}</td><td>${{((sLM/gtLM)*100).toFixed(1)}}%</td><td>${{((sTM/gtTM)*100).toFixed(1)}}%</td><td>${{(((sTM/gtTM)-(sLM/gtLM))*100).toFixed(1)}}%</td></tr>`;
+                BRAND_ORDER.filter(b=>sData.some(d=>d.brand===b)).forEach(b=>{{
+                    const bData = sData.filter(d=>d.brand===b);
+                    const lm = bData.reduce((a,c)=>a+c.lm,0), tm = bData.reduce((a,c)=>a+c.tm,0);
+                    const grw = (sTM>0?(tm/sTM)*100:0) - (sLM>0?(lm/sLM)*100:0);
+                    html += `<tr class="brand-row"><td class="brand-col-text">${{b}}</td><td>${{sLM>0?((lm/sLM)*100).toFixed(1):'0.0'}}%</td><td>${{sTM>0?((tm/sTM)*100).toFixed(1):'0.0'}}%</td><td class="${{grw>0?'highlight-green':(grw<0?'highlight-red':'')}}">${{grw.toFixed(1)}}%</td></tr>`;
+                }});
+            }});
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>`;
+            document.getElementById('bodyMS').innerHTML = html;
+        }}
+
+        function runAskAssistant() {{
+            const q = document.getElementById('askQuery').value;
+            const data = getFiltered();
+            const uniqueOutlets = [...new Set(data.map(d=>d.outlet))].sort();
+            let html = `<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>`;
+            let cnt = 0;
+            uniqueOutlets.forEach(out => {{
+                const rows = data.filter(d=>d.outlet===out);
+                if (q.includes("Deluxe Industry >=")) {{
+                    const dVol = rows.filter(d=>d.seg.includes('Deluxe')).reduce((a,c)=>a+c.tm,0);
+                    const iVol = rows.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+c.tm,0);
+                    if (dVol >= 30 && iVol === 0) {{ cnt++; html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`; }}
+                }} else if (q.includes("Semi Premium Whisky Industry >=")) {{
+                    const sVol = rows.filter(d=>d.seg==='Semi Premium-Whisky').reduce((a,c)=>a+c.tm,0);
+                    const mVol = rows.filter(d=>d.brand==='MHW').reduce((a,c)=>a+c.tm,0);
+                    if (sVol >= 50 && mVol === 0) {{ cnt++; html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(sVol)}}</b></td></tr>`; }}
+                }} else {{
+                    const bVol = rows.reduce((a,c)=>a+c.lm,0);
+                    const iVol = rows.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+c.tm,0);
+                    if (bVol > 0 && iVol === 0) {{ cnt++; html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(bVol)}}</b></td></tr>`; }}
+                }}
+            }});
+            if(!cnt) html += `<tr><td colspan="5">🎉 No gap outlets found!</td></tr>`;
+            document.getElementById('askTable').innerHTML = html + '</tbody>';
+        }}
+
+        function switchMainTab(id) {{
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            ['tabVol','tabMS','tabAsk'].forEach(t=>document.getElementById(t).style.display='none');
+            document.getElementById(id).style.display='block';
+            event.target.classList.add('active');
+        }}
+    </script>
+</body>
+</html>"""
+    return html_template
+
+# --- SIDEBAR WITH NEW OFFLINE OPTION ---
+st.sidebar.markdown("📁 **Data Source**")
+st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
+
+if st.sidebar.button("🔄 Refresh Data Now"):
+    st.cache_data.clear()
+    st.sidebar.success("Cache cleared! Fetching newest data...")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("⚡ **Offline Capabilities**")
+
+# Generate standalone offline PWA file
+offline_html_data = build_offline_html_bundle()
+st.sidebar.download_button(
+    label="📲 Download Offline App (PWA)",
+    data=offline_html_data,
+    file_name="WB_Sale_Offline.html",
+    mime="text/html",
+    help="Download this file once to your phone or laptop. Open it anytime to use the dashboard without an internet connection!"
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("📋 **Admin Panel**")
+
+if st.session_state.get("is_admin", False):
+    try:
+        sheet = get_sheet()
+        all_rows = sheet.get_all_values()
+        if len(all_rows) > 1:
+            headers = all_rows[0]
+            rows = all_rows[1:]
+            df_logs = pd.DataFrame(rows, columns=headers)
+            csv_logs = df_logs.to_csv(index=False).encode('utf-8')
+            st.sidebar.download_button(
+                label="📥 Download Google Sheet Logs",
+                data=csv_logs,
+                file_name="wb_login_logs.csv",
+                mime="text/csv"
+            )
+        else:
+            st.sidebar.info("ℹ️ Google Sheet connected. No logins recorded yet.")
+    except Exception as e:
+        err_msg = str(e).strip() if str(e).strip() else repr(e)
+        st.sidebar.error(f"⚠️ Log Connection Error: {err_msg}")
+else:
+    st.sidebar.info("Logs are saved securely in Google Sheets.")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("🔗 **[Go to FTS Calculator](https://wbftscalculator.streamlit.app/)**")
 
 # --- 8. EXACT ORDER MAPPING & DATA CONVERSION ---
 num_cols = ["Last Month", "Target", "This Month"]
@@ -728,14 +967,12 @@ if selected_search:
 else:
     filtered_df = temp_df.copy()
 
-# --- HELPER FUNCTION TO SORT ASMS ---
 def sort_asms(asm_list):
     valid_asms = [str(a) for a in asm_list if str(a).lower() not in ["nan", "none", ""]]
     sorted_normal = sorted([a for a in valid_asms if a.strip().lower() != "key accounts"])
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
 
-# --- INTERACTIVE ZOOMABLE TABLE WRAPPER HELPER ---
 def render_zoomable_table(html_content, table_key):
     zoom_level = st.select_slider(
         "🔍 Table Zoom Control (Mobile / Desktop)",
@@ -744,7 +981,6 @@ def render_zoomable_table(html_content, table_key):
         format_func=lambda x: f"{x}%",
         key=f"zoom_ctrl_{table_key}"
     )
-    
     wrapped_html = f"""
     <div style="zoom: {zoom_level}%; -moz-transform: scale({zoom_level/100}); -moz-transform-origin: top left; overflow-x: auto; touch-action: pan-x pan-y pinch-zoom;">
         {html_content}
@@ -752,7 +988,7 @@ def render_zoomable_table(html_content, table_key):
     """
     st.markdown(wrapped_html, unsafe_allow_html=True)
 
-# --- 10. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
+# --- 10. TABLE GENERATORS ---
 def generate_html_table(df, metric_type="Volume"):
     if not df.empty:
         df = df.copy()
@@ -793,7 +1029,7 @@ def generate_html_table(df, metric_type="Volume"):
                     else:
                         row_highlight = 'background-color: #def7ec; color: #03543f;'
                 bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
-                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap; {row_highlight}">{int(row["This Month"]):,}</td><td style="white-space:nowrap; {row_highlight}">{bal_str}</td></tr>'
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{int(row["Last Month"]):,}</td><td>{int(row["Target"]):,}</td><td>{int(row["This Month"]):,}</td><td style="{row_highlight}">{bal_str}</td></tr>'
         else: 
             seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
             seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
@@ -806,41 +1042,31 @@ def generate_html_table(df, metric_type="Volume"):
                 b_last_pct = (row["Last Month"] / seg_last) * 100 if seg_last else 0
                 b_this_pct = (row["This Month"] / seg_this) * 100 if seg_this else 0
                 b_growth = b_this_pct - b_last_pct
-                growth_highlight = ''
-                if b_growth > 0:
-                    growth_highlight = 'background-color: #def7ec; color: #03543f;'
-                elif b_growth < 0:
-                    growth_highlight = 'background-color: #fde8e8; color: #9b1c1c;'
+                growth_highlight = 'background-color: #def7ec; color: #03543f;' if b_growth > 0 else ('background-color: #fde8e8; color: #9b1c1c;' if b_growth < 0 else '')
                 growth_str = f"{b_growth:,.1f}%"
-                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap; {growth_highlight}">{growth_str}</td></tr>'
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{b_last_pct:,.1f}%</td><td>{b_this_pct:,.1f}%</td><td style="{growth_highlight}">{growth_str}</td></tr>'
 
     if metric_type == "Volume":
-        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">{int(gt_last_vol):,}</td><td style="white-space:nowrap;">{int(gt_target_vol):,}</td><td style="white-space:nowrap;">{int(gt_this_vol):,}</td><td style="white-space:nowrap;">{int(gt_bal_vol):,}</td></tr>'
+        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_last_vol):,}</td><td>{int(gt_target_vol):,}</td><td>{int(gt_this_vol):,}</td><td>{int(gt_bal_vol):,}</td></tr>'
     else:
-        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
+        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>'
     html += '</tbody></table></div>'
     return html
 
-# --- 11. HIERARCHY REPORT GENERATORS ---
 def get_segment_for_brand(b_name):
     if b_name == "MHW":
         return ["Semi Premium-Whisky"]
-    elif b_name in ["IBDC", "N1WSUP", "OCBL", "RSW", "SRB7", "RGW", "MCD Lux", "IQ"]:
-        return ["Deluxe-Whisky", "Deluxe Plus-Whisky"]
     return ["Deluxe-Whisky", "Deluxe Plus-Whisky"]
 
 def calc_ms_brand(sub_df, b_name):
     target_segs = get_segment_for_brand(b_name)
     brand_lm = sub_df[sub_df['Brand'] == b_name]['Last Month'].sum()
     brand_mtd = sub_df[sub_df['Brand'] == b_name]['This Month'].sum()
-    
     denom_lm = sub_df[sub_df['Segment'].isin(target_segs)]['Last Month'].sum()
     denom_mtd = sub_df[sub_df['Segment'].isin(target_segs)]['This Month'].sum()
-    
     lm_pct = (brand_lm / denom_lm * 100) if denom_lm > 0 else 0.0
     mtd_pct = (brand_mtd / denom_mtd * 100) if denom_mtd > 0 else 0.0
-    diff = mtd_pct - lm_pct
-    return lm_pct, mtd_pct, diff
+    return lm_pct, mtd_pct, (mtd_pct - lm_pct)
 
 def generate_hierarchy_table_1(df):
     brands_to_show = ["IBDC", "MHW"]
@@ -882,7 +1108,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -916,7 +1142,7 @@ def generate_hierarchy_table_1(df):
                 t_ms_m, _, _ = calc_ms_brand(t_df, "MHW")
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{ms_ibdc:.1f}%</td>'
+                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
                 html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
@@ -924,7 +1150,6 @@ def generate_hierarchy_table_1(df):
 
 def generate_hierarchy_table_2(df):
     brands_to_show = ["IBDC", "MCD Lux", "IQ", "N1WSUP", "OCBL", "RSW", "SRB7", "RGW", "MHW"]
-    
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     html += '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>'
     for b in brands_to_show:
@@ -985,8 +1210,7 @@ def generate_hierarchy_table_3(df):
     def get_outlet_counts(sub_df, brand_name):
         lm_outlets = sub_df[(sub_df['Brand'] == brand_name) & (sub_df['Last Month'] > 0)]['LIC No'].nunique() if 'LIC No' in sub_df.columns else 0
         mtd_outlets = sub_df[(sub_df['Brand'] == brand_name) & (sub_df['This Month'] > 0)]['LIC No'].nunique() if 'LIC No' in sub_df.columns else 0
-        diff = mtd_outlets - lm_outlets
-        return lm_outlets, mtd_outlets, diff
+        return lm_outlets, mtd_outlets, (mtd_outlets - lm_outlets)
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>'
     for b in brands_to_show:
@@ -1025,9 +1249,8 @@ def generate_hierarchy_table_3(df):
     html += '</tbody></table></div>'
     return html
 
-# --- 12. DISPLAY MAIN TABS ---
+# --- 11. DISPLAY MAIN TABS ---
 st.markdown("---")
-
 main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs(["📦 Volume", "📈 Ms%", "📊 Dashboard", "💬 Ask Assistant"])
 
 with main_tab1:
@@ -1040,119 +1263,74 @@ with main_tab2:
 
 with main_tab3:
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
-    
     with sub_tab1:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
         html_h1 = generate_hierarchy_table_1(filtered_df)
         render_zoomable_table(html_h1, "h1_tab")
-
     with sub_tab2:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
         render_zoomable_table(html_h2, "h2_tab")
-
     with sub_tab3:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
         render_zoomable_table(html_h3, "h3_tab")
 
 with main_tab4:
-    st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #94a3b8; font-size: 13.5px; font-family: Calibri, sans-serif;'>Perform advanced unbilled outlet queries, substitution gap analysis, run-rate comparisons, and multi-month brand trends.</p>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #f8fafc; font-size: 18px;'>🤖 Smart Sales & Outlet Query Assistant</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94a3b8; font-size: 13.5px;'>Perform advanced unbilled outlet queries, substitution gap analysis, run-rate comparisons, and multi-month brand trends.</p>", unsafe_allow_html=True)
 
-    # 1. Ask Assistant Controls
     col_q1, col_q2, col_q3 = st.columns([1.2, 1, 1.8])
-    
     with col_q1:
-        basis_period = st.selectbox(
-            "Basis on Period:",
-            [
-                "This Month (TM)",
-                "Last Month (LM)",
-                "Last 2 Months (LM + M2)",
-                "Last 3 Months (LM + M2 + M3)",
-                "Last 4 Months (LM + M2 + M3 + M4)",
-                "Last 5 Months (LM + M2 + M3 + M4 + M5)"
-            ]
-        )
-        
+        basis_period = st.selectbox("Basis on Period:", ["This Month (TM)", "Last Month (LM)", "Last 2 Months (LM + M2)", "Last 3 Months (LM + M2 + M3)", "Last 4 Months (LM + M2 + M3 + M4)", "Last 5 Months (LM + M2 + M3 + M4 + M5)"])
     with col_q2:
-        target_brand_choice = st.selectbox(
-            "Target Brand Focus:",
-            ["IBDC", "MHW", "MHFB", "BLGLM+BLGOR", "SMG+SMGP", "SIW", "Monarch"]
-        )
-
+        target_brand_choice = st.selectbox("Target Brand Focus:", ["IBDC", "MHW", "MHFB", "BLGLM+BLGOR", "SMG+SMGP", "SIW", "Monarch"])
     with col_q3:
-        query_type = st.selectbox(
-            "Choose a Query / Analysis:",
-            [
-                "-- Select a Query --",
-                # Gap / Opportunity Queries
-                "TIL Non Billed Outlets",
-                "Deluxe Industry >= 30 CS but IBDC Not Billed",
-                "Semi Premium Whisky Industry >= 50 CS but MHW Not Billed",
-                "Magic Moments Billed but BLG Not Billed",
-                "MCD Lux Billed but IBDC Not Billed",
-                "IQ Billed but IBDC Not Billed",
-                "RSW Billed but MHW Not Billed",
-                "RGW Billed but MHW Not Billed",
-                "SRB7 Billed but MHW Not Billed",
-                "RCW Billed but MHW Not Billed",
-                "All Season Billed but MHW Not Billed",
-                "SMG + SMGP Lapsed Outlets (Not Repeated)",
-                "SIW Lapsed Outlets (Not Repeated)",
-                # Run-rate & Trends
-                "Brand-wise L3M Daily Run vs Current Month Daily Run",
-                "Deluxe Industry - MS% Trend (6 Months)",
-                "Semi Premium Whisky Industry - MS% Trend (6 Months)",
-                "Deluxe Industry - Volume Trend (6 Months)",
-                "Semi Premium Whisky Industry - Volume Trend (6 Months)",
-                "Deluxe Industry - Unique Billed Outlets Trend (6 Months)",
-                "Semi Premium Whisky Industry - Unique Billed Outlets Trend (6 Months)"
-            ]
-        )
+        query_type = st.selectbox("Choose a Query / Analysis:", [
+            "-- Select a Query --",
+            "TIL Non Billed Outlets",
+            "Deluxe Industry >= 30 CS but IBDC Not Billed",
+            "Semi Premium Whisky Industry >= 50 CS but MHW Not Billed",
+            "Magic Moments Billed but BLG Not Billed",
+            "MCD Lux Billed but IBDC Not Billed",
+            "IQ Billed but IBDC Not Billed",
+            "RSW Billed but MHW Not Billed",
+            "RGW Billed but MHW Not Billed",
+            "SRB7 Billed but MHW Not Billed",
+            "RCW Billed but MHW Not Billed",
+            "All Season Billed but MHW Not Billed",
+            "SMG + SMGP Lapsed Outlets (Not Repeated)",
+            "SIW Lapsed Outlets (Not Repeated)",
+            "Brand-wise L3M Daily Run vs Current Month Daily Run",
+            "Deluxe Industry - MS% Trend (6 Months)",
+            "Semi Premium Whisky Industry - MS% Trend (6 Months)",
+            "Deluxe Industry - Volume Trend (6 Months)",
+            "Semi Premium Whisky Industry - Volume Trend (6 Months)",
+            "Deluxe Industry - Unique Billed Outlets Trend (6 Months)",
+            "Semi Premium Whisky Industry - Unique Billed Outlets Trend (6 Months)"
+        ])
 
-    # Lazy-load historical dataset if historical months are needed
     needs_history = any(x in query_type for x in ["Trend", "L3M", "Lapsed", "Billed", "Industry"]) or any(k in basis_period for k in ["2", "3", "4", "5"])
-    
     df_m2, df_m3, df_m4, df_m5 = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     if needs_history:
         with st.spinner("Fetching historical data (M2, M3, M4, M5)..."):
             hist_dfs, hist_err = load_historical_data_from_url(RAW_HISTORICAL_URL)
-            if hist_err or not hist_dfs:
-                st.warning(f"⚠️ Note: Could not load historical Excel (M2-M5): {hist_err}. Analysis will run on available data.")
-            else:
-                if "M2" in hist_dfs:
-                    df_m2 = standardize_df(hist_dfs["M2"])
-                    df_m2["Metric"] = "M2"
-                if "M3" in hist_dfs:
-                    df_m3 = standardize_df(hist_dfs["M3"])
-                    df_m3["Metric"] = "M3"
-                if "M4" in hist_dfs:
-                    df_m4 = standardize_df(hist_dfs["M4"])
-                    df_m4["Metric"] = "M4"
-                if "M5" in hist_dfs:
-                    df_m5 = standardize_df(hist_dfs["M5"])
-                    df_m5["Metric"] = "M5"
+            if not hist_err and hist_dfs:
+                if "M2" in hist_dfs: df_m2 = standardize_df(hist_dfs["M2"]); df_m2["Metric"] = "M2"
+                if "M3" in hist_dfs: df_m3 = standardize_df(hist_dfs["M3"]); df_m3["Metric"] = "M3"
+                if "M4" in hist_dfs: df_m4 = standardize_df(hist_dfs["M4"]); df_m4["Metric"] = "M4"
+                if "M5" in hist_dfs: df_m5 = standardize_df(hist_dfs["M5"]); df_m5["Metric"] = "M5"
 
-    # Define helper brand lists
     brand_family_map = {
-        "IBDC": ["IBDC"],
-        "MHW": ["MHW"],
-        "MHFB": ["MHFB"],
-        "BLGLM+BLGOR": ["BLGLM", "BLGOR"],
-        "SMG+SMGP": ["SMG", "SMGP"],
-        "SIW": ["SIW"],
-        "Monarch": ["Monarch"]
+        "IBDC": ["IBDC"], "MHW": ["MHW"], "MHFB": ["MHFB"],
+        "BLGLM+BLGOR": ["BLGLM", "BLGOR"], "SMG+SMGP": ["SMG", "SMGP"],
+        "SIW": ["SIW"], "Monarch": ["Monarch"]
     }
 
-    # Filter sets based on active filter cascade & search multiselect
     def apply_active_filters(df_in):
         if df_in.empty: return df_in
         res = df_in.copy()
-        
-        # 1. Multiselect Search Filter (Matches LIC No / Outlet Name)
         if selected_search:
             valid_lics = filtered_df["LIC No"].dropna().astype(str).str.strip().unique()
             if "LIC No" in res.columns:
@@ -1160,8 +1338,6 @@ with main_tab4:
             elif "Outlet Name" in res.columns:
                 valid_names = filtered_df["Outlet Name"].dropna().astype(str).str.strip().unique()
                 res = res[res["Outlet Name"].astype(str).str.strip().isin(valid_names)]
-                
-        # 2. Standard Dropdown Filters
         if selected_group != "All" and "Group" in res.columns:
             res = res[res["Group"].astype(str).str.strip() == str(selected_group).strip()]
         if selected_asm != "All" and "ASM" in res.columns:
@@ -1172,7 +1348,6 @@ with main_tab4:
             res = res[res["LIC No"].astype(str).str.strip() == str(selected_lic).strip()]
         if selected_outlet != "All" and "Outlet Name" in res.columns:
             res = res[res["Outlet Name"].astype(str).str.strip() == str(selected_outlet).strip()]
-            
         return res
 
     f_this = apply_active_filters(df_this)
@@ -1182,81 +1357,57 @@ with main_tab4:
     f_m4 = apply_active_filters(df_m4)
     f_m5 = apply_active_filters(df_m5)
 
-    # Compile the active basis dataset based on user dropdown selection
-    if "This Month (TM)" in basis_period:
-        basis_dfs = [f_this]
-    elif "Last 2 Months" in basis_period:
-        basis_dfs = [f_last, f_m2]
-    elif "Last 3 Months" in basis_period:
-        basis_dfs = [f_last, f_m2, f_m3]
-    elif "Last 4 Months" in basis_period:
-        basis_dfs = [f_last, f_m2, f_m3, f_m4]
-    elif "Last 5 Months" in basis_period:
-        basis_dfs = [f_last, f_m2, f_m3, f_m4, f_m5]
-    else:  # Last Month (LM)
-        basis_dfs = [f_last]
-    
-    basis_combined = pd.concat([d for d in basis_dfs if not d.empty], ignore_index=True) if basis_dfs else f_this
+    if "This Month (TM)" in basis_period: basis_dfs = [f_this]
+    elif "Last 2 Months" in basis_period: basis_dfs = [f_last, f_m2]
+    elif "Last 3 Months" in basis_period: basis_dfs = [f_last, f_m2, f_m3]
+    elif "Last 4 Months" in basis_period: basis_dfs = [f_last, f_m2, f_m3, f_m4]
+    elif "Last 5 Months" in basis_period: basis_dfs = [f_last, f_m2, f_m3, f_m4, f_m5]
+    else: basis_dfs = [f_last]
 
-    # Master base outlets in current filtered scope
+    basis_combined = pd.concat([d for d in basis_dfs if not d.empty], ignore_index=True) if basis_dfs else f_this
     base_outlets = filtered_df[["LIC No", "Outlet Name", "ASM", "TSE", "Group"]].drop_duplicates() if "LIC No" in filtered_df.columns else pd.DataFrame()
 
     st.markdown("---")
 
-    # --- QUERY EXECUTION LOGIC ---
     if query_type == "TIL Non Billed Outlets":
         target_brands = brand_family_map.get(target_brand_choice, [target_brand_choice])
-        
         basis_vol_map = basis_combined.groupby("LIC No")["Value"].sum().to_dict() if "LIC No" in basis_combined.columns else {}
         basis_billed = [k for k, v in basis_vol_map.items() if v > 0]
         this_billed_target = f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
-        
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))].copy()
-        
         unbilled_df["Volume (CS)"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
         unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
-        out_cnt = len(unbilled_df)
-        
-        st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but Have NOT Billed **TIL Brands** this Month (Total: {out_cnt:,} Outlets):")
-        
+        st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but Have NOT Billed **TIL Brands** this Month (Total: {len(unbilled_df):,} Outlets):")
         if not unbilled_df.empty:
             st.dataframe(unbilled_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"til_non_billing_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No unbilled outlets found for TIL Brands within the active filter scope!")
 
-    elif "Deluxe Industry >=" in query_type or "Deluxe Industry >" in query_type:
+    elif "Deluxe Industry >=" in query_type:
         deluxe_vol = basis_combined[basis_combined["Segment"].isin(["Deluxe-Whisky", "Deluxe Plus-Whisky"])].groupby("LIC No")["Value"].sum()
         deluxe_30_lics = deluxe_vol[deluxe_vol >= 30].index.tolist()
         ibdc_billed = f_this[(f_this["Brand"] == "IBDC") & (f_this["Value"] > 0)]["LIC No"].unique() if "Brand" in f_this.columns else []
-        
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
         res_df["Deluxe Vol (CS)"] = res_df["LIC No"].map(deluxe_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
-        out_cnt = len(res_df)
-        
-        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume >= 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
-        
+        st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume >= 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {len(res_df):,} Outlets):")
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="deluxe_30cs_ibdc_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
 
-    elif "Semi Premium Whisky Industry >=" in query_type or "Semi Premium Whisky Industry >" in query_type:
+    elif "Semi Premium Whisky Industry >=" in query_type:
         sp_vol = basis_combined[basis_combined["Segment"] == "Semi Premium-Whisky"].groupby("LIC No")["Value"].sum()
         sp_50_lics = sp_vol[sp_vol >= 50].index.tolist()
         mhw_billed = f_this[(f_this["Brand"] == "MHW") & (f_this["Value"] > 0)]["LIC No"].unique() if "Brand" in f_this.columns else []
-        
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
         res_df["SP Vol (CS)"] = res_df["LIC No"].map(sp_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
-        out_cnt = len(res_df)
-        
-        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume >= 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
-        
+        st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume >= 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {len(res_df):,} Outlets):")
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="sp_50cs_mhw_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -1264,46 +1415,24 @@ with main_tab4:
             st.success("🎉 No gap outlets found!")
 
     elif any(x in query_type for x in ["Magic Moments", "MCD Lux", "IQ", "RSW", "RGW", "SRB7", "RCW", "All Season"]):
-        if "Magic Moments" in query_type:
-            driver_b, target_b = ["MMV", "MMFLV"], ["BLGLM", "BLGOR"]
-            display_driver, display_target = "Magic Moments", "BLG"
-        elif "MCD Lux" in query_type:
-            driver_b, target_b = ["MCD Lux"], ["IBDC"]
-            display_driver, display_target = "MCD Lux", "IBDC"
-        elif "IQ" in query_type:
-            driver_b, target_b = ["IQ"], ["IBDC"]
-            display_driver, display_target = "IQ", "IBDC"
-        elif "RSW" in query_type:
-            driver_b, target_b = ["RSW"], ["MHW"]
-            display_driver, display_target = "RSW", "MHW"
-        elif "RGW" in query_type:
-            driver_b, target_b = ["RGW"], ["MHW"]
-            display_driver, display_target = "RGW", "MHW"
-        elif "SRB7" in query_type:
-            driver_b, target_b = ["SRB7"], ["MHW"]
-            display_driver, display_target = "SRB7", "MHW"
-        elif "RCW" in query_type:
-            driver_b, target_b = ["RCW"], ["MHW"]
-            display_driver, display_target = "RCW", "MHW"
-        elif "All Season" in query_type:
-            driver_b, target_b = ["All Season"], ["MHW"]
-            display_driver, display_target = "All Season", "MHW"
-        else:
-            driver_b, target_b = [], []
-            display_driver, display_target = "", ""
+        if "Magic Moments" in query_type: driver_b, target_b, display_driver, display_target = ["MMV", "MMFLV"], ["BLGLM", "BLGOR"], "Magic Moments", "BLG"
+        elif "MCD Lux" in query_type: driver_b, target_b, display_driver, display_target = ["MCD Lux"], ["IBDC"], "MCD Lux", "IBDC"
+        elif "IQ" in query_type: driver_b, target_b, display_driver, display_target = ["IQ"], ["IBDC"], "IQ", "IBDC"
+        elif "RSW" in query_type: driver_b, target_b, display_driver, display_target = ["RSW"], ["MHW"], "RSW", "MHW"
+        elif "RGW" in query_type: driver_b, target_b, display_driver, display_target = ["RGW"], ["MHW"], "RGW", "MHW"
+        elif "SRB7" in query_type: driver_b, target_b, display_driver, display_target = ["SRB7"], ["MHW"], "SRB7", "MHW"
+        elif "RCW" in query_type: driver_b, target_b, display_driver, display_target = ["RCW"], ["MHW"], "RCW", "MHW"
+        elif "All Season" in query_type: driver_b, target_b, display_driver, display_target = ["All Season"], ["MHW"], "All Season", "MHW"
+        else: driver_b, target_b, display_driver, display_target = [], [], "", ""
 
         driver_vol_series = basis_combined[basis_combined["Brand"].isin(driver_b)].groupby("LIC No")["Value"].sum()
         driver_outlets = driver_vol_series[driver_vol_series > 0].index.tolist()
         target_outlets = f_this[(f_this["Brand"].isin(target_b)) & (f_this["Value"] > 0)]["LIC No"].unique() if "LIC No" in f_this.columns else []
-        
         gap_lics = set(driver_outlets) - set(target_outlets)
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)].copy()
         gap_df["Billed Vol (CS)"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).astype(int)
         gap_df = gap_df.sort_values(by="Outlet Name", ascending=True)
-        out_cnt = len(gap_df)
-        
-        st.markdown(f"#### 🔍 Outlets Billing **{display_driver}** in **{basis_period}** but NOT Billing **{display_target}** this Month (Total: {out_cnt:,} Outlets):")
-        
+        st.markdown(f"#### 🔍 Outlets Billing **{display_driver}** in **{basis_period}** but NOT Billing **{display_target}** this Month (Total: {len(gap_df):,} Outlets):")
         if not gap_df.empty:
             st.dataframe(gap_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(gap_df), file_name="brand_gap_outlets.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -1313,24 +1442,16 @@ with main_tab4:
     elif "Lapsed Outlets" in query_type:
         target_brands = ["SMG", "SMGP"] if "SMG" in query_type else ["SIW"]
         brand_name_str = "SMG + SMGP" if "SMG" in query_type else "SIW"
-        
-        all_time_dfs = [f_this, f_last, f_m2, f_m3, f_m4, f_m5]
-        all_time_combined = pd.concat([d for d in all_time_dfs if not d.empty], ignore_index=True)
-        
+        all_time_combined = pd.concat([d for d in [f_this, f_last, f_m2, f_m3, f_m4, f_m5] if not d.empty], ignore_index=True)
         target_hist_vol = all_time_combined[all_time_combined["Brand"].isin(target_brands)].groupby("LIC No")["Value"].sum()
         anytime_billed = target_hist_vol[target_hist_vol > 0].index.tolist()
-        
         selected_period_billed = set(basis_combined[(basis_combined["Brand"].isin(target_brands)) & (basis_combined["Value"] > 0)]["LIC No"].dropna().unique()) if not basis_combined.empty else set()
         tm_billed = set(f_this[(f_this["Brand"].isin(target_brands)) & (f_this["Value"] > 0)]["LIC No"].dropna().unique()) if not f_this.empty else set()
-        
         not_repeated = set(anytime_billed) - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)].copy()
         res_df["Historical Vol (CS)"] = res_df["LIC No"].map(target_hist_vol).fillna(0).astype(int)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
-        out_cnt = len(res_df)
-        
-        st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}** (Total: {out_cnt:,} Outlets):")
-        
+        st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}** (Total: {len(res_df):,} Outlets):")
         if not res_df.empty:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name=f"{brand_name_str}_lapsed.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -1341,19 +1462,11 @@ with main_tab4:
         st.markdown(f"#### 📊 Brand-wise L3M Daily Run (L3M Vol / 90) vs TM Daily Run (TM Vol / {days_elapsed} Days):")
         st.caption(f"ℹ️ *Current calculation basis: **{f2_display_date}** (Elapsed Days: **{days_elapsed}** from 'Users' Sheet Cell F2)*")
         
-        # Calculate L3M Volume (LM + M2 + M3)
-        l3m_dfs = [f_last]
-        if not f_m2.empty: l3m_dfs.append(f_m2)
-        if not f_m3.empty: l3m_dfs.append(f_m3)
-        
-        l3m_comb = pd.concat(l3m_dfs, ignore_index=True)
-        
+        l3m_comb = pd.concat([d for d in [f_last, f_m2, f_m3] if not d.empty], ignore_index=True)
         grp_l3m = l3m_comb.groupby([seg_col, brand_col], as_index=False, observed=False)["Value"].sum().rename(columns={"Value": "L3M_Vol"})
         grp_tm = f_this.groupby([seg_col, brand_col], as_index=False, observed=False)["Value"].sum().rename(columns={"Value": "TM_Vol"})
-        
         rr_merged = pd.merge(master_brands, grp_l3m, on=[seg_col, brand_col], how="left").fillna(0)
         rr_merged = pd.merge(rr_merged, grp_tm, on=[seg_col, brand_col], how="left").fillna(0)
-        
         marked_brands = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW']
         
         html_rr = '<div class="table-wrapper"><table class="custom-dashboard-table">'
@@ -1367,7 +1480,6 @@ with main_tab4:
         gt_growth_pct = round(((gt_tm_daily - gt_l3m_daily) / gt_l3m_daily) * 100, 1) if gt_l3m_daily > 0 else 0.0
 
         excel_rows = []
-
         for segment, seg_data in rr_merged.groupby(seg_col, sort=False, observed=False):
             seg_l3m_v = seg_data["L3M_Vol"].sum()
             seg_tm_v = seg_data["TM_Vol"].sum()
@@ -1377,7 +1489,6 @@ with main_tab4:
             seg_g_pct = round(((seg_tm_d - seg_l3m_d) / seg_l3m_d) * 100, 1) if seg_l3m_d > 0 else 0.0
             
             html_rr += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{int(seg_l3m_v):,}</td><td>{seg_l3m_d:,.1f}</td><td>{int(seg_tm_v):,}</td><td>{seg_tm_d:,.1f}</td><td>{seg_g_cs:+,.1f}</td><td>{seg_g_pct:+,.1f}%</td></tr>'
-            
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 b_l3m_v = row["L3M_Vol"]
@@ -1386,99 +1497,61 @@ with main_tab4:
                 b_tm_d = round(b_tm_v / float(days_elapsed), 1)
                 b_g_cs = round(b_tm_d - b_l3m_d, 1)
                 b_g_pct = round(((b_tm_d - b_l3m_d) / b_l3m_d) * 100, 1) if b_l3m_d > 0 else (100.0 if b_tm_d > 0 else 0.0)
-                
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 growth_highlight = 'background-color: #def7ec; color: #03543f;' if b_g_cs > 0 else ('background-color: #fde8e8; color: #9b1c1c;' if b_g_cs < 0 else '')
-                
                 html_rr += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{int(b_l3m_v):,}</td><td>{b_l3m_d:,.1f}</td><td>{int(b_tm_v):,}</td><td>{b_tm_d:,.1f}</td><td style="{growth_highlight}">{b_g_cs:+,.1f}</td><td style="{growth_highlight}">{b_g_pct:+,.1f}%</td></tr>'
-                
                 excel_rows.append({
-                    "Segment": segment,
-                    "Brand": b_name,
-                    "L3M Total Vol": int(b_l3m_v),
-                    "L3M Daily Run (/90)": b_l3m_d,
-                    "TM Total Vol": int(b_tm_v),
-                    f"TM Daily Run (/{days_elapsed} Days)": b_tm_d,
-                    "Growth (CS)": b_g_cs,
-                    "Growth %": f"{b_g_pct:+,.1f}%"
+                    "Segment": segment, "Brand": b_name, "L3M Total Vol": int(b_l3m_v),
+                    "L3M Daily Run (/90)": b_l3m_d, "TM Total Vol": int(b_tm_v),
+                    f"TM Daily Run (/{days_elapsed} Days)": b_tm_d, "Growth (CS)": b_g_cs, "Growth %": f"{b_g_pct:+,.1f}%"
                 })
 
-        html_rr += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_l3m_vol):,}</td><td>{gt_l3m_daily:,.1f}</td><td>{int(gt_tm_vol):,}</td><td>{gt_tm_daily:,.1f}</td><td>{gt_growth_cs:+,.1f}</td><td>{gt_growth_pct:+,.1f}%</td></tr>'
-        html_rr += '</tbody></table></div>'
-        
+        html_rr += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_l3m_vol):,}</td><td>{gt_l3m_daily:,.1f}</td><td>{int(gt_tm_vol):,}</td><td>{gt_tm_daily:,.1f}</td><td>{gt_growth_cs:+,.1f}</td><td>{gt_growth_pct:+,.1f}%</td></tr></tbody></table></div>'
         render_zoomable_table(html_rr, "rr_query")
-        
-        df_export_rr = pd.DataFrame(excel_rows)
-        st.download_button("📥 Download in Excel", data=to_excel_bytes(df_export_rr), file_name="l3m_vs_tm_daily_run_segmented.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button("📥 Download in Excel", data=to_excel_bytes(pd.DataFrame(excel_rows)), file_name="l3m_vs_tm_daily_run_segmented.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # --- 6-MONTH TREND TABLES (TM, LM, M2, M3, M4, M5) ---
     elif "Trend" in query_type:
         is_deluxe = "Deluxe" in query_type
-        is_sp = "Semi Premium" in query_type
         is_ms = "MS%" in query_type
         is_vol = "Volume" in query_type
         is_wod = "Unique Billed" in query_type
-        
         deluxe_brands = ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"]
         sp_brands = ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"]
-        
         target_industry_name = "Deluxe-Whisky" if is_deluxe else "Semi Premium-Whisky"
         brand_list = deluxe_brands if is_deluxe else sp_brands
         industry_segs = ["Deluxe-Whisky", "Deluxe Plus-Whisky"] if is_deluxe else ["Semi Premium-Whisky"]
-        
         trend_months = ["TM", "LM", "M2", "M3", "M4", "M5"]
-        months_dict = {
-            "TM": f_this,
-            "LM": f_last,
-            "M2": f_m2,
-            "M3": f_m3,
-            "M4": f_m4,
-            "M5": f_m5
-        }
+        months_dict = {"TM": f_this, "LM": f_last, "M2": f_m2, "M3": f_m3, "M4": f_m4, "M5": f_m5}
         
         html_trend = '<div class="table-wrapper"><table class="custom-dashboard-table">'
         html_trend += '<thead><tr><th class="seg-col-text">Brand</th>' + ''.join([f'<th>{m}</th>' for m in trend_months]) + '</tr></thead><tbody>'
-        
-        # Industry Header Row
         html_trend += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{target_industry_name}</b></td>'
         for m_key in trend_months:
             m_df = months_dict[m_key]
-            if m_df.empty:
-                html_trend += '<td>-</td>'
-                continue
+            if m_df.empty: html_trend += '<td>-</td>'; continue
             ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
             if is_ms:
                 ind_sum = ind_sub["Value"].sum()
                 html_trend += '<td>100.0%</td>' if ind_sum > 0 else '<td>0.0%</td>'
-            elif is_vol:
-                html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
-            elif is_wod:
-                html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+            elif is_vol: html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
+            elif is_wod: html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
         html_trend += '</tr>'
-        
-        # Brand Rows
         for b in brand_list:
             html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
             for m_key in trend_months:
                 m_df = months_dict[m_key]
-                if m_df.empty:
-                    html_trend += '<td>-</td>'
-                    continue
+                if m_df.empty: html_trend += '<td>-</td>'; continue
                 ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
                 b_sub = ind_sub[ind_sub["Brand"] == b]
-                
                 if is_ms:
                     ind_tot = ind_sub["Value"].sum()
                     b_tot = b_sub["Value"].sum()
                     ms_pct = (b_tot / ind_tot * 100) if ind_tot > 0 else 0.0
                     html_trend += f'<td>{ms_pct:.1f}%</td>'
-                elif is_vol:
-                    html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
-                elif is_wod:
-                    html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+                elif is_vol: html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
+                elif is_wod: html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
             html_trend += '</tr>'
-            
         html_trend += '</tbody></table></div>'
         st.markdown(f"#### 📈 {query_type}:")
         render_zoomable_table(html_trend, "trend_query")
