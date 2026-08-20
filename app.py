@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 import io
@@ -879,13 +880,13 @@ def build_offline_html_bundle():
                     if (isM) gtBAL += (tgt - tm);
 
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal).toLocaleString():''}}</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
                 }});
 
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
             }});
 
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL).toLocaleString()}}</td></tr>`;
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
         }}
 
@@ -999,7 +1000,7 @@ def build_offline_html_bundle():
 </html>"""
     return html_template
 
-# --- SIDEBAR WITH INSTANT IN-MEMORY OFFLINE LAUNCHER ---
+# --- SIDEBAR WITH IN-MEMORY OFFLINE TAB LAUNCHER ---
 st.sidebar.markdown("📁 **Data Source**")
 st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
 
@@ -1010,13 +1011,13 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("⚡ **Offline Capabilities**")
 
-# Generate In-Memory Standalone Blob Launcher (No local storage or downloading required)
+# Generate In-Memory HTML payload
 offline_html_raw = build_offline_html_bundle()
 b64_encoded_html = base64.b64encode(offline_html_raw.encode("utf-8")).decode("utf-8")
 
-launch_offline_js_btn = f"""
-<a href="data:text/html;base64,{b64_encoded_html}" target="_blank" style="text-decoration: none;">
-    <button style="
+launch_offline_btn = f"""
+<div style="width: 100%;">
+    <button onclick="launchOfflineTab()" style="
         width: 100%;
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
@@ -1031,10 +1032,29 @@ launch_offline_js_btn = f"""
     ">
         🚀 Launch Offline Mode (New Tab)
     </button>
-</a>
+</div>
+
+<script>
+function launchOfflineTab() {{
+    const b64Data = "{b64_encoded_html}";
+    const byteCharacters = atob(b64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {{
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }}
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], {{ type: 'text/html;charset=utf-8' }});
+    const blobUrl = URL.createObjectURL(blob);
+    
+    const newWindow = window.open(blobUrl, '_blank');
+    if (!newWindow) {{
+        alert('⚠️ Popup blocked! Please allow popups for this site to open offline mode.');
+    }}
+}}
+</script>
 """
-st.sidebar.markdown(launch_offline_js_btn, unsafe_allow_html=True)
-st.sidebar.caption("💡 *Opens instantly in a new tab. Works 100% offline with zero files stored on your disk.*")
+components.html(launch_offline_btn, height=55)
+st.sidebar.caption("💡 *Opens in a new tab. Works 100% offline with zero files stored on disk.*")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
@@ -1310,7 +1330,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_i:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -1327,7 +1347,7 @@ def generate_hierarchy_table_1(df):
                 t_ms_m, _, _ = calc_ms_brand(t_df, "MHW")
 
                 html += f'<tr class="brand-row"><td class="brand-col-text" style="padding-left: 25px;">{tse}</td>'
-                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{t_ms_i:.1f}%</td>'
+                html += f'<td>{int(t_lm_i):,}</td><td>{int(t_tgt_i):,}</td><td>{int(t_mtd_i):,}</td><td>{ms_ibdc:.1f}%</td>'
                 html += f'<td>{int(t_lm_m):,}</td><td>{int(t_tgt_m):,}</td><td>{int(t_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
     html += '</tbody></table></div>'
@@ -1719,8 +1739,10 @@ with main_tab4:
             if is_ms:
                 ind_sum = ind_sub["Value"].sum()
                 html_trend += '<td>100.0%</td>' if ind_sum > 0 else '<td>0.0%</td>'
-            elif is_vol: html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
-            elif is_wod: html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+            elif is_vol:
+                html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
+            elif is_wod:
+                html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
         html_trend += '</tr>'
         for b in brand_list:
             html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
@@ -1734,8 +1756,10 @@ with main_tab4:
                     b_tot = b_sub["Value"].sum()
                     ms_pct = (b_tot / ind_tot * 100) if ind_tot > 0 else 0.0
                     html_trend += f'<td>{ms_pct:.1f}%</td>'
-                elif is_vol: html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
-                elif is_wod: html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+                elif is_vol:
+                    html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
+                elif is_wod:
+                    html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
             html_trend += '</tr>'
         html_trend += '</tbody></table></div>'
         st.markdown(f"#### 📈 {query_type}:")
