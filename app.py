@@ -116,7 +116,7 @@ hide_streamlit_style = """
             .brand-row { 
                 background-color: #FFFFFF !important; 
                 color: #000000 !important; 
-                font-size: 13px !important;
+                font-size: 13px !important; 
             }
             .brand-col-text { 
                 text-align: left !important; 
@@ -189,7 +189,7 @@ def to_excel_bytes(df):
         df.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
-# --- 5. DATA FETCHING (FROM STREAMLIT SECRETS) ---
+# --- 5. DATA FETCHING ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
@@ -241,9 +241,9 @@ if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
     st.stop()
 
-# --- 6. LOGIN CREDENTIAL & EXACT F2 DATE EXTRACTOR ---
+# --- 6. USERS & DYNAMIC F2 DATE ---
 if "Users" not in dfs:
-    st.error("❌ Could not find the 'Users' sheet in your Excel file. Please add it with columns: Name, user_id, password.")
+    st.error("❌ Could not find the 'Users' sheet in your Excel file.")
     st.stop()
 
 raw_users_df = dfs["Users"].copy()
@@ -459,7 +459,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CUSTOM TITLE & LOGOUT ---
 col_logo, col_title, col_logout = st.columns([1, 5, 2])
 with col_logo:
     try:
@@ -563,12 +562,27 @@ df_raw = pd.pivot_table(
     aggfunc="sum"
 ).reset_index()
 
+for c in ["This Month", "Last Month", "Target"]:
+    if c in df_raw.columns:
+        df_raw[c] = pd.to_numeric(df_raw[c], errors="coerce").fillna(0)
+    else:
+        df_raw[c] = 0.0
+
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (FIXED CASCADING & MASTER BRAND GRID) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (ZERO-NAN SANITIZED) ---
 def build_offline_html_bundle():
     records_export = []
+    
+    def clean_num(val):
+        try:
+            if pd.isna(val) or val is None:
+                return 0.0
+            return float(val)
+        except Exception:
+            return 0.0
+
     for _, row in df_raw.iterrows():
         records_export.append({
             "lic": str(row.get("LIC No", "")).strip(),
@@ -579,9 +593,9 @@ def build_offline_html_bundle():
             "tse": str(row.get("TSE", "Unassigned")).strip(),
             "seg": str(row.get("Segment", "Deluxe-Whisky")).strip(),
             "brand": str(row.get("Brand", "")).strip(),
-            "tm": float(row.get("This Month", 0)),
-            "lm": float(row.get("Last Month", 0)),
-            "tgt": float(row.get("Target", 0))
+            "tm": clean_num(row.get("This Month", 0)),
+            "lm": clean_num(row.get("Last Month", 0)),
+            "tgt": clean_num(row.get("Target", 0))
         })
 
     users_export = df_users_clean.to_dict(orient="records")
@@ -683,7 +697,6 @@ def build_offline_html_bundle():
         const appUsers = {users_json_str};
         const appSales = {sales_json_str};
 
-        const SEG_ORDER = ["Deluxe-Whisky", "Semi Premium-Whisky", "Deluxe-Gin", "Premium-Brandy", "Premium-Gin", "Semi Premium-Brandy", "Single Malt-Scotch"];
         const MASTER_STRUCTURE = [
             {{ seg: "Deluxe-Whisky", brands: ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"] }},
             {{ seg: "Semi Premium-Whisky", brands: ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"] }},
@@ -694,6 +707,11 @@ def build_offline_html_bundle():
             {{ seg: "Single Malt-Scotch", brands: ["SIW"] }}
         ];
         const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
+
+        function toNum(v) {{
+            const n = parseFloat(v);
+            return isNaN(n) ? 0 : n;
+        }}
 
         function handleLogin() {{
             const u = document.getElementById('loginUser').value.trim().toLowerCase();
@@ -715,12 +733,11 @@ def build_offline_html_bundle():
             document.getElementById('loginSection').style.display = 'block';
         }}
 
-        /* --- TRUE CASCADING FILTER LOGIC --- */
         function getScopedRecords(level) {{
-            const grp = document.getElementById('selGroup').value;
-            const asm = document.getElementById('selASM').value;
-            const tse = document.getElementById('selTSE').value;
-            const lic = document.getElementById('selLIC').value;
+            const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
+            const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
+            const tse = decodeURIComponent(document.getElementById('selTSE').value || 'All');
+            const lic = decodeURIComponent(document.getElementById('selLIC').value || 'All');
 
             return appSales.filter(d => {{
                 if (level >= 1 && grp !== 'All' && d.group !== grp) return false;
@@ -733,7 +750,7 @@ def build_offline_html_bundle():
 
         function setSelectOptions(id, values, keepSelected = true) {{
             const sel = document.getElementById(id);
-            const prev = sel.value;
+            const prev = decodeURIComponent(sel.value || 'All');
             sel.innerHTML = '<option value="All">All</option>' + values.map(v => `<option value="${{encodeURIComponent(v)}}">${{v}}</option>`).join('');
             if (keepSelected && values.includes(prev)) sel.value = encodeURIComponent(prev);
             else sel.value = 'All';
@@ -785,11 +802,11 @@ def build_offline_html_bundle():
         }}
 
         function getFilteredData() {{
-            const grp = decodeURIComponent(document.getElementById('selGroup').value);
-            const asm = decodeURIComponent(document.getElementById('selASM').value);
-            const tse = decodeURIComponent(document.getElementById('selTSE').value);
-            const lic = decodeURIComponent(document.getElementById('selLIC').value);
-            const out = decodeURIComponent(document.getElementById('selOutlet').value);
+            const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
+            const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
+            const tse = decodeURIComponent(document.getElementById('selTSE').value || 'All');
+            const lic = decodeURIComponent(document.getElementById('selLIC').value || 'All');
+            const out = decodeURIComponent(document.getElementById('selOutlet').value || 'All');
 
             return appSales.filter(d => {{
                 if (grp !== 'All' && d.group !== grp) return false;
@@ -814,40 +831,42 @@ def build_offline_html_bundle():
             MASTER_STRUCTURE.forEach(group => {{
                 const segName = group.seg;
                 const segRecords = data.filter(d => d.seg === segName);
-                const sLM = segRecords.reduce((a,c)=>a+c.lm, 0);
-                const sTGT = segRecords.reduce((a,c)=>a+c.tgt, 0);
-                const sTM = segRecords.reduce((a,c)=>a+c.tm, 0);
+                const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                const sTGT = segRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
+                const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
 
-                html += `<tr class="subtotal-row"><td>${{segName}}</td><td>${{Math.round(sLM)}}</td><td>${{Math.round(sTGT)}}</td><td>${{Math.round(sTM)}}</td><td></td></tr>`;
+                html += `<tr class="subtotal-row"><td>${{segName}}</td><td>${{Math.round(sLM).toLocaleString()}}</td><td>${{Math.round(sTGT).toLocaleString()}}</td><td>${{Math.round(sTM).toLocaleString()}}</td><td></td></tr>`;
 
                 group.brands.forEach(b => {{
                     const bRecords = segRecords.filter(d => d.brand === b);
-                    const lm = bRecords.reduce((a,c)=>a+c.lm, 0);
-                    const tgt = bRecords.reduce((a,c)=>a+c.tgt, 0);
-                    const tm = bRecords.reduce((a,c)=>a+c.tm, 0);
+                    const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                    const tgt = bRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
+                    const tm = bRecords.reduce((a,c)=>a + toNum(c.tm), 0);
                     const isM = MARKED_BRANDS.includes(b);
                     const bal = isM ? (tgt - tm) : '';
                     if (isM) gtBAL += (tgt - tm);
 
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm)}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm)}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt).toLocaleString()}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal).toLocaleString():''}}</td></tr>`;
                 }});
 
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
             }});
 
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM)}}</td><td>${{Math.round(gtTGT)}}</td><td>${{Math.round(gtTM)}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL).toLocaleString()}}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
         }}
 
         function renderMS(data) {{
-            let html = '', gtLM = data.reduce((a,c)=>a+c.lm,0)||1, gtTM = data.reduce((a,c)=>a+c.tm,0)||1;
+            const gtLM = data.reduce((a,c)=>a + toNum(c.lm), 0) || 1;
+            const gtTM = data.reduce((a,c)=>a + toNum(c.tm), 0) || 1;
+            let html = '';
 
             MASTER_STRUCTURE.forEach(group => {{
                 const segName = group.seg;
                 const segRecords = data.filter(d => d.seg === segName);
-                const sLM = segRecords.reduce((a,c)=>a+c.lm, 0);
-                const sTM = segRecords.reduce((a,c)=>a+c.tm, 0);
+                const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
                 const sLMPct = (sLM / gtLM) * 100;
                 const sTMPct = (sTM / gtTM) * 100;
 
@@ -855,8 +874,8 @@ def build_offline_html_bundle():
 
                 group.brands.forEach(b => {{
                     const bRecords = segRecords.filter(d => d.brand === b);
-                    const lm = bRecords.reduce((a,c)=>a+c.lm, 0);
-                    const tm = bRecords.reduce((a,c)=>a+c.tm, 0);
+                    const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                    const tm = bRecords.reduce((a,c)=>a + toNum(c.tm), 0);
                     const bLMPct = sLM > 0 ? (lm / sLM) * 100 : 0;
                     const bTMPct = sTM > 0 ? (tm / sTM) * 100 : 0;
                     const grw = bTMPct - bLMPct;
@@ -880,22 +899,22 @@ def build_offline_html_bundle():
             uniqueOutlets.forEach(out => {{
                 const rows = data.filter(d => d.outlet === out);
                 if (q.includes("Deluxe Industry >=")) {{
-                    const dVol = rows.filter(d => d.seg && d.seg.includes('Deluxe')).reduce((a,c)=>a+c.tm, 0);
-                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+c.tm, 0);
+                    const dVol = rows.filter(d => d.seg && d.seg.includes('Deluxe')).reduce((a,c)=>a + toNum(c.tm), 0);
+                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
                     if (dVol >= 30 && iVol === 0) {{
                         cnt++;
                         html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`;
                     }}
                 }} else if (q.includes("Semi Premium Whisky Industry >=")) {{
-                    const sVol = rows.filter(d => d.seg === 'Semi Premium-Whisky').reduce((a,c)=>a+c.tm, 0);
-                    const mVol = rows.filter(d => d.brand === 'MHW').reduce((a,c)=>a+c.tm, 0);
+                    const sVol = rows.filter(d => d.seg === 'Semi Premium-Whisky').reduce((a,c)=>a + toNum(c.tm), 0);
+                    const mVol = rows.filter(d => d.brand === 'MHW').reduce((a,c)=>a + toNum(c.tm), 0);
                     if (sVol >= 50 && mVol === 0) {{
                         cnt++;
                         html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(sVol)}}</b></td></tr>`;
                     }}
                 }} else {{
-                    const bVol = rows.reduce((a,c)=>a+c.lm, 0);
-                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a+c.tm, 0);
+                    const bVol = rows.reduce((a,c)=>a + toNum(c.lm), 0);
+                    const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
                     if (bVol > 0 && iVol === 0) {{
                         cnt++;
                         html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(bVol)}}</b></td></tr>`;
@@ -1195,7 +1214,7 @@ def generate_hierarchy_table_1(df):
 
         html += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{zone}</b></td>'
         html += f'<td>{int(z_lm_i):,}</td><td>{int(z_tgt_i):,}</td><td>{int(z_mtd_i):,}</td><td>{z_ms_i:.1f}%</td>'
-        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+        html += f'<td>{int(z_lm_m):,}</td><td>{int(z_tgt_m):,}</td><td>{int(z_mtd_m):,}</td><td>{z_ms_m:.1f}%</td></tr>'
 
         asms = sort_asms(z_df['ASM'].dropna().unique())
         for asm in asms:
@@ -1212,7 +1231,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_i:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -1621,8 +1640,10 @@ with main_tab4:
             if is_ms:
                 ind_sum = ind_sub["Value"].sum()
                 html_trend += '<td>100.0%</td>' if ind_sum > 0 else '<td>0.0%</td>'
-            elif is_vol: html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
-            elif is_wod: html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+            elif is_vol:
+                html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
+            elif is_wod:
+                html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
         html_trend += '</tr>'
         for b in brand_list:
             html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
@@ -1636,8 +1657,10 @@ with main_tab4:
                     b_tot = b_sub["Value"].sum()
                     ms_pct = (b_tot / ind_tot * 100) if ind_tot > 0 else 0.0
                     html_trend += f'<td>{ms_pct:.1f}%</td>'
-                elif is_vol: html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
-                elif is_wod: html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
+                elif is_vol:
+                    html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
+                elif is_wod:
+                    html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
             html_trend += '</tr>'
         html_trend += '</tbody></table></div>'
         st.markdown(f"#### 📈 {query_type}:")
