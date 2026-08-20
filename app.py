@@ -596,8 +596,9 @@ if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
 # --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (CACHED WITH USER BYPASS) ---
 @st.cache_data
 def get_injected_offline_html(df_json, user_name, user_role):
-    if os.path.exists("offline_template.html"):
-        with open("offline_template.html", "r", encoding="utf-8") as f:
+    template_path = "offline_template.html"
+    if os.path.exists(template_path):
+        with open(template_path, "r", encoding="utf-8") as f:
             template = f.read()
     else:
         template = "<html><body>Template file missing in repository!</body></html>"
@@ -953,7 +954,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
