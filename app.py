@@ -572,19 +572,13 @@ for c in ["This Month", "Last Month", "Target"]:
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (100% IDENTICAL HIERARCHY & FEATURES) ---
-def build_offline_html_bundle():
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (CACHED FOR STREAMLIT PERFORMANCE) ---
+@st.cache_data
+def build_offline_html_bundle_cached(df_raw_json, df_users_json):
     records_export = []
+    raw_records = json.loads(df_raw_json)
     
-    def clean_num(val):
-        try:
-            if pd.isna(val) or val is None:
-                return 0.0
-            return float(val)
-        except Exception:
-            return 0.0
-
-    for _, row in df_raw.iterrows():
+    for row in raw_records:
         records_export.append({
             "lic": str(row.get("LIC No", "")).strip(),
             "outlet": str(row.get("Outlet Name", "")).strip(),
@@ -594,13 +588,12 @@ def build_offline_html_bundle():
             "tse": str(row.get("TSE", "Unassigned")).strip(),
             "seg": str(row.get("Segment", "Deluxe-Whisky")).strip(),
             "brand": str(row.get("Brand", "")).strip(),
-            "tm": clean_num(row.get("This Month", 0)),
-            "lm": clean_num(row.get("Last Month", 0)),
-            "tgt": clean_num(row.get("Target", 0))
+            "tm": float(row.get("This Month", 0) or 0),
+            "lm": float(row.get("Last Month", 0) or 0),
+            "tgt": float(row.get("Target", 0) or 0)
         })
 
-    users_export = df_users_clean.to_dict(orient="records")
-    users_json_str = json.dumps(users_export)
+    users_json_str = df_users_json
     sales_json_str = json.dumps(records_export)
 
     html_template = f"""<!DOCTYPE html>
@@ -886,13 +879,13 @@ def build_offline_html_bundle():
                     if (isM) gtBAL += (tgt - tm);
 
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt).toLocaleString()}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal).toLocaleString():''}}</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
                 }});
 
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
             }});
 
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL).toLocaleString()}}</td></tr>`;
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
         }}
 
@@ -940,7 +933,6 @@ def build_offline_html_bundle():
         }}
 
         function renderHierarchyFull(data) {{
-            // 1. Table H1 (Target vs Ach)
             let h1 = '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr><tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>';
             
             const iLM_T = data.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
@@ -955,7 +947,6 @@ def build_offline_html_bundle():
 
             h1 += `<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td><td>${{Math.round(iLM_T).toLocaleString()}}</td><td>${{Math.round(iTGT_T).toLocaleString()}}</td><td>${{Math.round(iTM_T).toLocaleString()}}</td><td>${{iMS_T.toFixed(1)}}%</td><td>${{Math.round(mLM_T).toLocaleString()}}</td><td>${{Math.round(mTGT_T).toLocaleString()}}</td><td>${{Math.round(mTM_T).toLocaleString()}}</td><td>${{mMS_T.toFixed(1)}}%</td></tr>`;
 
-            // 2. Table H2 (MS% Details)
             let h2 = '<thead><tr><th class="seg-col-text" rowspan="2">ZONE/ASM/TSE</th>';
             H2_BRANDS.forEach(b => h2 += `<th colspan="3">${{b}}</th>`);
             h2 += '</tr><tr>';
@@ -969,7 +960,6 @@ def build_offline_html_bundle():
             }});
             h2 += '</tr>';
 
-            // 3. Table H3 (WOD Unique Outlets)
             let h3 = '<thead><tr><th class="seg-col-text" rowspan="2">Unique Billing Outlet<br>ZONE/ASM/TSE</th>';
             H3_BRANDS.forEach(b => h3 += `<th colspan="3">${{b}}</th>`);
             h3 += '</tr><tr>';
@@ -985,12 +975,10 @@ def build_offline_html_bundle():
             }});
             h3 += '</tr>';
 
-            // Zone -> ASM -> TSE Nesting for H1, H2, H3
             const zones = [...new Set(data.map(d => d.zone).filter(Boolean))].sort();
             zones.forEach(z => {{
                 const zData = data.filter(d => d.zone === z);
 
-                // H1 Zone
                 const ziLM = zData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
                 const ziTGT = zData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
                 const ziTM = zData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
@@ -1001,7 +989,6 @@ def build_offline_html_bundle():
                 const zmMS = calcMSBrand(zData, 'MHW').tm;
                 h1 += `<tr class="subtotal-row"><td class="seg-col-text"><b>${{z}}</b></td><td>${{Math.round(ziLM).toLocaleString()}}</td><td>${{Math.round(ziTGT).toLocaleString()}}</td><td>${{Math.round(ziTM).toLocaleString()}}</td><td>${{ziMS.toFixed(1)}}%</td><td>${{Math.round(zmLM).toLocaleString()}}</td><td>${{Math.round(zmTGT).toLocaleString()}}</td><td>${{Math.round(zmTM).toLocaleString()}}</td><td>${{zmMS.toFixed(1)}}%</td></tr>`;
 
-                // H2 Zone
                 h2 += `<tr class="subtotal-row"><td class="seg-col-text"><b>${{z}}</b></td>`;
                 H2_BRANDS.forEach(b => {{
                     const r = calcMSBrand(zData, b);
@@ -1009,7 +996,6 @@ def build_offline_html_bundle():
                 }});
                 h2 += '</tr>';
 
-                // H3 Zone
                 h3 += `<tr class="subtotal-row"><td class="seg-col-text"><b>${{z}}</b></td>`;
                 H3_BRANDS.forEach(b => {{
                     const lmCnt = new Set(zData.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
@@ -1023,7 +1009,6 @@ def build_offline_html_bundle():
                 asms.forEach(asm => {{
                     const aData = zData.filter(d => d.asm === asm);
 
-                    // H1 ASM
                     const aiLM = aData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
                     const aiTGT = aData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
                     const aiTM = aData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
@@ -1034,7 +1019,6 @@ def build_offline_html_bundle():
                     const amMS = calcMSBrand(aData, 'MHW').tm;
                     h1 += `<tr class="subtotal-row"><td class="seg-col-text" style="padding-left:14px;"><b>${{asm}}</b></td><td>${{Math.round(aiLM).toLocaleString()}}</td><td>${{Math.round(aiTGT).toLocaleString()}}</td><td>${{Math.round(aiTM).toLocaleString()}}</td><td>${{aiMS.toFixed(1)}}%</td><td>${{Math.round(amLM).toLocaleString()}}</td><td>${{Math.round(amTGT).toLocaleString()}}</td><td>${{Math.round(amTM).toLocaleString()}}</td><td>${{amMS.toFixed(1)}}%</td></tr>`;
 
-                    // H2 ASM
                     h2 += `<tr class="subtotal-row"><td class="seg-col-text" style="padding-left:14px;"><b>${{asm}}</b></td>`;
                     H2_BRANDS.forEach(b => {{
                         const r = calcMSBrand(aData, b);
@@ -1042,7 +1026,6 @@ def build_offline_html_bundle():
                     }});
                     h2 += '</tr>';
 
-                    // H3 ASM
                     h3 += `<tr class="subtotal-row"><td class="seg-col-text" style="padding-left:14px;"><b>${{asm}}</b></td>`;
                     H3_BRANDS.forEach(b => {{
                         const lmCnt = new Set(aData.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
@@ -1056,7 +1039,6 @@ def build_offline_html_bundle():
                     tses.forEach(tse => {{
                         const tData = aData.filter(d => d.tse === tse);
 
-                        // H1 TSE
                         const tiLM = tData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
                         const tiTGT = tData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
                         const tiTM = tData.filter(d=>d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
@@ -1067,7 +1049,6 @@ def build_offline_html_bundle():
                         const tmMS = calcMSBrand(tData, 'MHW').tm;
                         h1 += `<tr class="brand-row"><td class="brand-col-text" style="padding-left:26px;">${{tse}}</td><td>${{Math.round(tiLM).toLocaleString()}}</td><td>${{Math.round(tiTGT).toLocaleString()}}</td><td>${{Math.round(tiTM).toLocaleString()}}</td><td>${{tiMS.toFixed(1)}}%</td><td>${{Math.round(tmLM).toLocaleString()}}</td><td>${{Math.round(tmTGT).toLocaleString()}}</td><td>${{Math.round(tmTM).toLocaleString()}}</td><td>${{tmMS.toFixed(1)}}%</td></tr>`;
 
-                        // H2 TSE
                         h2 += `<tr class="brand-row"><td class="brand-col-text" style="padding-left:26px;">${{tse}}</td>`;
                         H2_BRANDS.forEach(b => {{
                             const r = calcMSBrand(tData, b);
@@ -1075,7 +1056,6 @@ def build_offline_html_bundle():
                         }});
                         h2 += '</tr>';
 
-                        // H3 TSE
                         h3 += `<tr class="brand-row"><td class="brand-col-text" style="padding-left:26px;">${{tse}}</td>`;
                         H3_BRANDS.forEach(b => {{
                             const lmCnt = new Set(tData.filter(d=>d.brand===b && toNum(d.lm)>0).map(d=>d.lic)).size;
@@ -1162,8 +1142,10 @@ if st.sidebar.button("🔄 Refresh Data Now"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("⚡ **Offline Capabilities**")
 
-# Generate In-Memory HTML payload
-offline_html_raw = build_offline_html_bundle()
+# Clean memory payload using cached bundling
+df_raw_json_str = df_raw.to_json(orient="records")
+df_users_json_str = df_users_clean.to_json(orient="records")
+offline_html_raw = build_offline_html_bundle_cached(df_raw_json_str, df_users_json_str)
 b64_encoded_html = base64.b64encode(offline_html_raw.encode("utf-8")).decode("utf-8")
 
 launch_offline_btn = f"""
@@ -1482,7 +1464,7 @@ def generate_hierarchy_table_1(df):
 
             html += f'<tr class="subtotal-row"><td class="seg-col-text" style="padding-left: 10px;"><b>{asm}</b></td>'
             html += f'<td>{int(a_lm_i):,}</td><td>{int(a_tgt_i):,}</td><td>{int(a_mtd_i):,}</td><td>{a_ms_i:.1f}%</td>'
-            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{ms_mhw:.1f}%</td></tr>'
+            html += f'<td>{int(a_lm_m):,}</td><td>{int(a_tgt_m):,}</td><td>{int(a_mtd_m):,}</td><td>{a_ms_m:.1f}%</td></tr>'
 
             tses = a_df['TSE'].dropna().unique() if 'TSE' in a_df.columns else []
             for tse in sorted(tses):
@@ -1721,7 +1703,8 @@ with main_tab4:
     elif "Last 5 Months" in basis_period: basis_dfs = [f_last, f_m2, f_m3, f_m4, f_m5]
     else: basis_dfs = [f_last]
 
-    basis_combined = pd.concat([d for d in basis_dfs if not d.empty], ignore_index=True) if basis_dfs else f_this
+    valid_basis_dfs = [d for d in basis_dfs if not d.empty]
+    basis_combined = pd.concat(valid_basis_dfs, ignore_index=True) if len(valid_basis_dfs) > 0 else f_this
     base_outlets = filtered_df[["LIC No", "Outlet Name", "ASM", "TSE", "Group"]].drop_duplicates() if "LIC No" in filtered_df.columns else pd.DataFrame()
 
     st.markdown("---")
@@ -1799,7 +1782,8 @@ with main_tab4:
     elif "Lapsed Outlets" in query_type:
         target_brands = ["SMG", "SMGP"] if "SMG" in query_type else ["SIW"]
         brand_name_str = "SMG + SMGP" if "SMG" in query_type else "SIW"
-        all_time_combined = pd.concat([d for d in [f_this, f_last, f_m2, f_m3, f_m4, f_m5] if not d.empty], ignore_index=True)
+        all_time_dfs = [d for d in [f_this, f_last, f_m2, f_m3, f_m4, f_m5] if not d.empty]
+        all_time_combined = pd.concat(all_time_dfs, ignore_index=True) if len(all_time_dfs) > 0 else f_this
         target_hist_vol = all_time_combined[all_time_combined["Brand"].isin(target_brands)].groupby("LIC No")["Value"].sum()
         anytime_billed = target_hist_vol[target_hist_vol > 0].index.tolist()
         selected_period_billed = set(basis_combined[(basis_combined["Brand"].isin(target_brands)) & (basis_combined["Value"] > 0)]["LIC No"].dropna().unique()) if not basis_combined.empty else set()
@@ -1819,7 +1803,8 @@ with main_tab4:
         st.markdown(f"#### 📊 Brand-wise L3M Daily Run (L3M Vol / 90) vs TM Daily Run (TM Vol / {days_elapsed} Days):")
         st.caption(f"ℹ️ *Current calculation basis: **{f2_display_date}** (Elapsed Days: **{days_elapsed}** from 'Users' Sheet Cell F2)*")
         
-        l3m_comb = pd.concat([d for d in [f_last, f_m2, f_m3] if not d.empty], ignore_index=True)
+        valid_l3m = [d for d in [f_last, f_m2, f_m3] if not d.empty]
+        l3m_comb = pd.concat(valid_l3m, ignore_index=True) if len(valid_l3m) > 0 else f_last
         grp_l3m = l3m_comb.groupby([seg_col, brand_col], as_index=False, observed=False)["Value"].sum().rename(columns={"Value": "L3M_Vol"})
         grp_tm = f_this.groupby([seg_col, brand_col], as_index=False, observed=False)["Value"].sum().rename(columns={"Value": "TM_Vol"})
         rr_merged = pd.merge(master_brands, grp_l3m, on=[seg_col, brand_col], how="left").fillna(0)
