@@ -77,21 +77,10 @@
         <div class="tab-bar">
             <button class="tab-btn active" onclick="switchMainTab('tabVol')">📦 Volume</button>
             <button class="tab-btn" onclick="switchMainTab('tabMS')">📈 Ms%</button>
-            <button class="tab-btn" onclick="switchMainTab('tabDash')">📊 Dashboard</button>
             <button class="tab-btn" onclick="switchMainTab('tabAsk')">💬 Ask Assistant</button>
         </div>
         <div id="tabVol"><div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div></div>
         <div id="tabMS" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div></div>
-        <div id="tabDash" style="display: none;">
-            <div class="sub-tab-bar">
-                <button class="sub-tab-btn active" onclick="switchSubTab('subTarget')">Target vs Ach</button>
-                <button class="sub-tab-btn" onclick="switchSubTab('subMSDet')">MS% Details</button>
-                <button class="sub-tab-btn" onclick="switchSubTab('subWOD')">WOD Details</button>
-            </div>
-            <div id="subTarget"><div class="table-wrapper"><table class="custom-table" id="tableH1"></table></div></div>
-            <div id="subMSDet" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableH2"></table></div></div>
-            <div id="subWOD" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableH3"></table></div></div>
-        </div>
         <div id="tabAsk" style="display: none;">
             <div class="card">
                 <div class="grid-filters">
@@ -110,159 +99,163 @@
     </div>
 
     <script>
-        // Injected Payload from Python Server
         let appUsers = {{USERS_JSON}};
         let appSales = {{SALES_JSON}};
 
-        // Load cached data from local storage if available offline
-        if (localStorage.getItem('wb_cached_sales')) {{
-            try {{
+        if (localStorage.getItem('wb_cached_sales')) {
+            try {
                 appSales = JSON.parse(localStorage.getItem('wb_cached_sales'));
                 appUsers = JSON.parse(localStorage.getItem('wb_cached_users'));
-            }} catch(e) {{}}
-        }} else {{
+            } catch(e) {}
+        } else {
             localStorage.setItem('wb_cached_sales', JSON.stringify(appSales));
             localStorage.setItem('wb_cached_users', JSON.stringify(appUsers));
-        }}
+        }
 
         const MASTER_STRUCTURE = [
-            {{ seg: "Deluxe-Whisky", brands: ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"] }},
-            {{ seg: "Semi Premium-Whisky", brands: ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"] }},
-            {{ seg: "Deluxe-Gin", brands: ["BLGLM", "BLGOR", "Big Ben", "Blue Riband"] }},
-            {{ seg: "Premium-Brandy", brands: ["Monarch"] }},
-            {{ seg: "Premium-Gin", brands: ["SMG", "SMGP"] }},
-            {{ seg: "Semi Premium-Brandy", brands: ["MHFB"] }},
-            {{ seg: "Single Malt-Scotch", brands: ["SIW"] }}
+            { seg: "Deluxe-Whisky", brands: ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"] },
+            { seg: "Semi Premium-Whisky", brands: ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"] },
+            { seg: "Deluxe-Gin", brands: ["BLGLM", "BLGOR", "Big Ben", "Blue Riband"] },
+            { seg: "Premium-Brandy", brands: ["Monarch"] },
+            { seg: "Premium-Gin", brands: ["SMG", "SMGP"] },
+            { seg: "Semi Premium-Brandy", brands: ["MHFB"] },
+            { seg: "Single Malt-Scotch", brands: ["SIW"] }
         ];
         const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
 
-        function toNum(v) {{ const n = parseFloat(v); return isNaN(n) ? 0 : n; }}
+        function toNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
-        function handleLogin() {{
+        function handleLogin() {
             const u = document.getElementById('loginUser').value.trim().toLowerCase();
             const p = document.getElementById('loginPass').value.trim();
-            const matched = appUsers.find(x => (String(x.user_id).toLowerCase() === u || String(x.Name).toLowerCase() === u) && String(x.password) === p);
-            if (matched) {{
+            
+            const matched = appUsers.find(x => {
+                const dbUser = String(x.user_id || '').trim().toLowerCase();
+                const dbName = String(x.Name || '').trim().toLowerCase();
+                const dbPass = String(x.password || '').trim();
+                return (dbUser === u || dbName === u) && dbPass === p;
+            });
+
+            if (matched) {
                 document.getElementById('loginSection').style.display = 'none';
                 document.getElementById('mainDashboard').style.display = 'block';
-                document.getElementById('userBadge').innerHTML = `👤 <b>${{matched.Name}}</b><br><span>${{matched.role || 'User'}}</span>`;
+                document.getElementById('userBadge').innerHTML = `👤 <b>${matched.Name}</b><br><span>${matched.role || 'User'}</span>`;
                 initCascadingFilters();
                 updateDashboard();
-            }} else {{
+            } else {
                 document.getElementById('loginError').style.display = 'block';
-            }}
-        }}
+            }
+        }
 
-        function handleLogout() {{
+        function handleLogout() {
             document.getElementById('mainDashboard').style.display = 'none';
             document.getElementById('loginSection').style.display = 'block';
-        }}
+        }
 
-        async function manualRefreshData() {{
-            if (!navigator.onLine) {{
+        async function manualRefreshData() {
+            if (!navigator.onLine) {
                 alert('⚠️ You are currently offline. Connect to the internet to check for updates.');
                 return;
-            }}
+            }
             document.getElementById('syncStatus').innerText = '🔄 Checking updates...';
-            try {{
+            try {
                 const res = await fetch(window.location.href);
                 const htmlText = await res.text();
-                // Extract updated sales JSON from HTML
                 const startIdx = htmlText.indexOf('let appSales = [');
                 const endIdx = htmlText.indexOf(';', startIdx);
-                if (startIdx !== -1 && endIdx !== -1) {{
+                if (startIdx !== -1 && endIdx !== -1) {
                     const salesJs = htmlText.substring(startIdx + 15, endIdx);
                     appSales = JSON.parse(salesJs);
                     localStorage.setItem('wb_cached_sales', JSON.stringify(appSales));
                     document.getElementById('syncStatus').innerText = '● Data Updated Successfully!';
                     updateDashboard();
                     alert('✓ Data successfully updated from server!');
-                }}
-            }} catch(err) {{
+                }
+            } catch(err) {
                 document.getElementById('syncStatus').innerText = '● Using Offline Cache';
                 alert('⚠️ Could not reach server. Working with latest cached data.');
-            }}
-        }}
+            }
+        }
 
-        function getScopedRecords(level) {{
+        function getScopedRecords(level) {
             const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
             const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
             const tse = decodeURIComponent(document.getElementById('selTSE').value || 'All');
             const lic = decodeURIComponent(document.getElementById('selLIC').value || 'All');
-            return appSales.filter(d => {{
+            return appSales.filter(d => {
                 if (level >= 1 && grp !== 'All' && d.group !== grp) return false;
                 if (level >= 2 && asm !== 'All' && d.asm !== asm) return false;
                 if (level >= 3 && tse !== 'All' && d.tse !== tse) return false;
                 if (level >= 4 && lic !== 'All' && d.lic !== lic) return false;
                 return true;
-            }});
-        }}
+            });
+        }
 
-        function setSelectOptions(id, values) {{
+        function setSelectOptions(id, values) {
             const sel = document.getElementById(id);
             const prev = decodeURIComponent(sel.value || 'All');
-            sel.innerHTML = '<option value="All">All</option>' + values.map(v => `<option value="${{encodeURIComponent(v)}}">${{v}}</option>`).join('');
+            sel.innerHTML = '<option value="All">All</option>' + values.map(v => `<option value="${encodeURIComponent(v)}">${v}</option>`).join('');
             if (values.includes(prev)) sel.value = encodeURIComponent(prev);
             else sel.value = 'All';
-        }}
+        }
 
-        function initCascadingFilters() {{
+        function initCascadingFilters() {
             const groups = [...new Set(appSales.map(d => d.group).filter(Boolean))].sort();
             setSelectOptions('selGroup', groups);
             onGroupChange();
-        }}
+        }
 
-        function onGroupChange() {{
+        function onGroupChange() {
             setSelectOptions('selASM', [...new Set(getScopedRecords(1).map(d => d.asm).filter(Boolean))].sort());
             onASMChange();
-        }}
-        function onASMChange() {{
+        }
+        function onASMChange() {
             setSelectOptions('selTSE', [...new Set(getScopedRecords(2).map(d => d.tse).filter(Boolean))].sort());
             onTSEChange();
-        }}
-        function onTSEChange() {{
+        }
+        function onTSEChange() {
             setSelectOptions('selLIC', [...new Set(getScopedRecords(3).map(d => d.lic).filter(Boolean))].sort());
             onLICChange();
-        }}
-        function onLICChange() {{
+        }
+        function onLICChange() {
             setSelectOptions('selOutlet', [...new Set(getScopedRecords(4).map(d => d.outlet).filter(Boolean))].sort());
             updateDashboard();
-        }}
-        function onOutletChange() {{ updateDashboard(); }}
+        }
+        function onOutletChange() { updateDashboard(); }
 
-        function getFilteredData() {{
+        function getFilteredData() {
             const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
             const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
             const tse = decodeURIComponent(document.getElementById('selTSE').value || 'All');
             const lic = decodeURIComponent(document.getElementById('selLIC').value || 'All');
             const out = decodeURIComponent(document.getElementById('selOutlet').value || 'All');
 
-            return appSales.filter(d => {{
+            return appSales.filter(d => {
                 if (grp !== 'All' && d.group !== grp) return false;
                 if (asm !== 'All' && d.asm !== asm) return false;
                 if (tse !== 'All' && d.tse !== tse) return false;
                 if (lic !== 'All' && d.lic !== lic) return false;
                 if (out !== 'All' && d.outlet !== out) return false;
                 return true;
-            }});
-        }}
+            });
+        }
 
-        function updateDashboard() {{
+        function updateDashboard() {
             const data = getFilteredData();
             renderVol(data);
             renderMS(data);
             runAskAssistant();
-        }}
+        }
 
-        function renderVol(data) {{
+        function renderVol(data) {
             let html = '', gtLM = 0, gtTGT = 0, gtTM = 0, gtBAL = 0;
-            MASTER_STRUCTURE.forEach(group => {{
+            MASTER_STRUCTURE.forEach(group => {
                 const segRecords = data.filter(d => d.seg === group.seg);
                 const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
                 const sTGT = segRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
                 const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
-                html += `<tr class="subtotal-row"><td>${{group.seg}}</td><td>${{Math.round(sLM).toLocaleString()}}</td><td>${{Math.round(sTGT).toLocaleString()}}</td><td>${{Math.round(sTM).toLocaleString()}}</td><td></td></tr>`;
-                group.brands.forEach(b => {{
+                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${Math.round(sLM).toLocaleString()}</td><td>${Math.round(sTGT).toLocaleString()}</td><td>${Math.round(sTM).toLocaleString()}</td><td></td></tr>`;
+                group.brands.forEach(b => {
                     const bRecords = segRecords.filter(d => d.brand === b);
                     const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
                     const tgt = bRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
@@ -271,68 +264,62 @@
                     const bal = isM ? (tgt - tm) : '';
                     if (isM) gtBAL += (tgt - tm);
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
-                }});
+                    html += `<tr class="brand-row"><td class="brand-col-text ${isM?'marked-brand':''}">${b}</td><td>${Math.round(lm).toLocaleString()}</td><td>${Math.round(tgt)}</td><td class="${hl}">${Math.round(tm).toLocaleString()}</td><td class="${hl}">${bal!==''?Math.round(bal):''}</td></tr>`;
+                });
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
-            }});
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
+            });
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${Math.round(gtLM).toLocaleString()}</td><td>${Math.round(gtTGT).toLocaleString()}</td><td>${Math.round(gtTM).toLocaleString()}</td><td>${Math.round(gtBAL)}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
-        }}
+        }
 
-        function renderMS(data) {{
+        function renderMS(data) {
             const gtLM = data.reduce((a,c)=>a + toNum(c.lm), 0) || 1;
             const gtTM = data.reduce((a,c)=>a + toNum(c.tm), 0) || 1;
             let html = '';
-            MASTER_STRUCTURE.forEach(group => {{
+            MASTER_STRUCTURE.forEach(group => {
                 const segRecords = data.filter(d => d.seg === group.seg);
                 const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
                 const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
-                html += `<tr class="subtotal-row"><td>${{group.seg}}</td><td>${{((sLM/gtLM)*100).toFixed(1)}}%</td><td>${{((sTM/gtTM)*100).toFixed(1)}}%</td><td>${{(((sTM/gtTM)-(sLM/gtLM))*100).toFixed(1)}}%</td></tr>`;
-                group.brands.forEach(b => {{
+                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${((sLM/gtLM)*100).toFixed(1)}%</td><td>${((sTM/gtTM)*100).toFixed(1)}%</td><td>{(((sTM/gtTM)-(sLM/gtLM))*100).toFixed(1)}%</td></tr>`;
+                group.brands.forEach(b => {
                     const bRecords = segRecords.filter(d => d.brand === b);
                     const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
                     const tm = bRecords.reduce((a,c)=>a + toNum(c.tm), 0);
                     const bLMPct = sLM > 0 ? (lm / sLM) * 100 : 0;
                     const bTMPct = sTM > 0 ? (tm / sTM) * 100 : 0;
                     const grw = bTMPct - bLMPct;
-                    html += `<tr class="brand-row"><td class="brand-col-text">${{b}}</td><td>${{bLMPct.toFixed(1)}}%</td><td>${{bTMPct.toFixed(1)}}%</td><td class="${{grw>0?'highlight-green':(grw<0?'highlight-red':'')}}">${{grw.toFixed(1)}}%</td></tr>`;
-                }});
-            }});
+                    html += `<tr class="brand-row"><td class="brand-col-text">${b}</td><td>${bLMPct.toFixed(1)}%</td><td>${bTMPct.toFixed(1)}%</td><td class="${grw>0?'highlight-green':(grw<0?'highlight-red':'')}">${grw.toFixed(1)}%</td></tr>`;
+                });
+            });
             html += `<tr class="grand-total-row"><td>Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>`;
             document.getElementById('bodyMS').innerHTML = html;
-        }}
+        }
 
-        function runAskAssistant() {{
+        function runAskAssistant() {
             const q = document.getElementById('askQuery').value;
             const data = getFilteredData();
             const uniqueOutlets = [...new Set(data.map(d => d.outlet).filter(Boolean))].sort();
             let html = '<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>';
             let cnt = 0;
-            uniqueOutlets.forEach(out => {{
+            uniqueOutlets.forEach(out => {
                 const rows = data.filter(d => d.outlet === out);
                 const dVol = rows.filter(d => d.seg && d.seg.includes('Deluxe')).reduce((a,c)=>a + toNum(c.tm), 0);
                 const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
-                if (dVol >= 30 && iVol === 0) {{
+                if (dVol >= 30 && iVol === 0) {
                     cnt++;
-                    html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`;
-                }}
-            }});
+                    html += `<tr><td>${rows[0].lic}</td><td style="text-align:left;">${rows[0].outlet}</td><td>${rows[0].asm}</td><td>${rows[0].tse}</td><td><b>${Math.round(dVol)}</b></td></tr>`;
+                }
+            });
             if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>';
             document.getElementById('askTable').innerHTML = html + '</tbody>';
-        }}
+        }
 
-        function switchMainTab(id) {{
+        function switchMainTab(id) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            ['tabVol','tabMS','tabDash','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            ['tabVol','tabMS','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
             document.getElementById(id).style.display = 'block';
             event.target.classList.add('active');
-        }}
-        function switchSubTab(id) {{
-            document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-            ['subTarget','subMSDet','subWOD'].forEach(t => document.getElementById(t).style.display = 'none');
-            document.getElementById(id).style.display = 'block';
-            event.target.classList.add('active');
-        }}
+        }
     </script>
 </body>
 </html>
