@@ -593,7 +593,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR (SAFE TEMPLATE REPLACEMENT) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR ---
 @st.cache_data
 def get_offline_html_bundle(df_json, user_name, user_role):
     records_export = []
@@ -658,7 +658,7 @@ def get_offline_html_bundle(df_json, user_name, user_role):
                 <span id="syncStatus" style="font-size: 12px; font-weight: bold; color: #10b981;">● Ready Offline</span>
             </div>
             <div style="display: flex; gap: 15px; align-items: center;">
-                <button class="btn btn-green" onclick="manualRefreshData()" style="padding: 5px 10px; font-size: 12px;">🔄 Check Update</button>
+                <button class="btn btn-green" onclick="location.reload()" style="padding: 5px 10px; font-size: 12px;">🔄 Refresh Offline Data</button>
                 <div class="user-badge">👤 <b>__USER_NAME__</b><br><span>__USER_ROLE__</span></div>
                 <button class="btn btn-red" onclick="window.close()">Close</button>
             </div>
@@ -700,12 +700,6 @@ def get_offline_html_bundle(df_json, user_name, user_role):
     <script>
         let appSales = __SALES_DATA__;
 
-        if (localStorage.getItem('wb_cached_sales')) {
-            try { appSales = JSON.parse(localStorage.getItem('wb_cached_sales')); } catch(e) {}
-        } else {
-            localStorage.setItem('wb_cached_sales', JSON.stringify(appSales));
-        }
-
         const MASTER_STRUCTURE = [
             { seg: "Deluxe-Whisky", brands: ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"] },
             { seg: "Semi Premium-Whisky", brands: ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"] },
@@ -723,29 +717,6 @@ def get_offline_html_bundle(df_json, user_name, user_role):
             initCascadingFilters();
             updateDashboard();
         };
-
-        async function manualRefreshData() {
-            if (!navigator.onLine) {
-                alert('⚠️ You are currently offline.');
-                return;
-            }
-            document.getElementById('syncStatus').innerText = '🔄 Checking updates...';
-            try {
-                const res = await fetch(window.location.href);
-                const htmlText = await res.text();
-                const startIdx = htmlText.indexOf('let appSales = [');
-                const endIdx = htmlText.indexOf(';', startIdx);
-                if (startIdx !== -1 && endIdx !== -1) {
-                    appSales = JSON.parse(htmlText.substring(startIdx + 15, endIdx));
-                    localStorage.setItem('wb_cached_sales', JSON.stringify(appSales));
-                    document.getElementById('syncStatus').innerText = '● Data Updated!';
-                    updateDashboard();
-                    alert('✓ Data successfully updated!');
-                }
-            } catch(err) {
-                alert('⚠️ Could not reach server.');
-            }
-        }
 
         function getScopedRecords(level) {
             const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
