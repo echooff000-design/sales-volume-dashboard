@@ -593,7 +593,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR ---
+# --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR (DETTO SAME UI & FEATURES) ---
 @st.cache_data
 def get_offline_html_bundle(df_json, user_name, user_role):
     records_export = []
@@ -617,7 +617,7 @@ def get_offline_html_bundle(df_json, user_name, user_role):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WB Sale Data (Offline PWA)</title>
+    <title>WB Sale Data (Offline Mode)</title>
     <style>
         * { box-sizing: border-box; }
         body { background-color: #0f172a; color: #f8fafc; font-family: Calibri, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 15px; }
@@ -635,6 +635,9 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         .tab-bar { display: flex; gap: 12px; border-bottom: 2px solid #334155; margin-bottom: 15px; overflow-x: auto; }
         .tab-btn { background: none; border: none; color: #ef4444; font-size: 14px; font-weight: 600; padding: 10px 14px; cursor: pointer; white-space: nowrap; }
         .tab-btn.active { font-weight: 700; border-bottom: 3px solid #ef4444; }
+        .sub-tab-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+        .sub-tab-btn { background: #1e293b; border: 1px solid #475569; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+        .sub-tab-btn.active { background: #3b82f6; color: #ffffff; border-color: #3b82f6; }
         .table-wrapper { width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; border-radius: 4px; }
         .custom-table { width: 100%; border-collapse: collapse; font-family: Calibri, sans-serif; background-color: #ffffff; color: #000000; font-size: 13.5px; }
         .custom-table th, .custom-table td { border: 1px solid #d3d3d3; padding: 6px 8px; text-align: center; white-space: nowrap; }
@@ -655,10 +658,9 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         <div class="header-bar">
             <div>
                 <h3 style="margin: 0; font-size: 22px;">WB Sale Data</h3>
-                <span id="syncStatus" style="font-size: 12px; font-weight: bold; color: #10b981;">● Ready Offline</span>
+                <span style="font-size: 12px; font-weight: bold; color: #10b981;">● 100% Offline Mode Active</span>
             </div>
             <div style="display: flex; gap: 15px; align-items: center;">
-                <button class="btn btn-green" onclick="location.reload()" style="padding: 5px 10px; font-size: 12px;">🔄 Refresh Offline Data</button>
                 <div class="user-badge">👤 <b>__USER_NAME__</b><br><span>__USER_ROLE__</span></div>
                 <button class="btn btn-red" onclick="window.close()">Close</button>
             </div>
@@ -666,20 +668,43 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         <div class="card">
             <h4 style="margin: 0 0 10px 0; font-size: 16px;">🔍 Filters</h4>
             <div class="grid-filters">
-                <div><label>Group</label><select id="selGroup" onchange="onGroupChange()"></select></div>
-                <div><label>ASM</label><select id="selASM" onchange="onASMChange()"></select></div>
-                <div><label>TSE</label><select id="selTSE" onchange="onTSEChange()"></select></div>
-                <div><label>LIC No</label><select id="selLIC" onchange="onLICChange()"></select></div>
-                <div><label>Outlet</label><select id="selOutlet" onchange="onOutletChange()"></select></div>
+                <div><label>Group Filter</label><select id="selGroup" onchange="onGroupChange()"></select></div>
+                <div><label>ASM Filter</label><select id="selASM" onchange="onASMChange()"></select></div>
+                <div><label>TSE Filter</label><select id="selTSE" onchange="onTSEChange()"></select></div>
+                <div><label>LIC No Filter</label><select id="selLIC" onchange="onLICChange()"></select></div>
+                <div><label>Outlet Filter</label><select id="selOutlet" onchange="onOutletChange()"></select></div>
             </div>
         </div>
         <div class="tab-bar">
             <button class="tab-btn active" onclick="switchMainTab('tabVol')">📦 Volume</button>
             <button class="tab-btn" onclick="switchMainTab('tabMS')">📈 Ms%</button>
+            <button class="tab-btn" onclick="switchMainTab('tabDash')">📊 Dashboard</button>
             <button class="tab-btn" onclick="switchMainTab('tabAsk')">💬 Ask Assistant</button>
         </div>
-        <div id="tabVol"><div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div></div>
-        <div id="tabMS" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div></div>
+
+        <!-- TAB 1: VOLUME -->
+        <div id="tabVol">
+            <div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div>
+        </div>
+
+        <!-- TAB 2: MS% -->
+        <div id="tabMS" style="display: none;">
+            <div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div>
+        </div>
+
+        <!-- TAB 3: DASHBOARD HIERARCHIES -->
+        <div id="tabDash" style="display: none;">
+            <div class="sub-tab-bar">
+                <button class="sub-tab-btn active" onclick="switchSubTab('subTarget')">Target vs Ach</button>
+                <button class="sub-tab-btn" onclick="switchSubTab('subMS')">MS% Details</button>
+                <button class="sub-tab-btn" onclick="switchSubTab('subWOD')">WOD Details</button>
+            </div>
+            <div id="subTarget"><div class="table-wrapper"><table class="custom-table" id="tableH1"></table></div></div>
+            <div id="subMS" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableH2"></table></div></div>
+            <div id="subWOD" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableH3"></table></div></div>
+        </div>
+
+        <!-- TAB 4: ASK ASSISTANT -->
         <div id="tabAsk" style="display: none;">
             <div class="card">
                 <div class="grid-filters">
@@ -784,6 +809,7 @@ def get_offline_html_bundle(df_json, user_name, user_role):
             const data = getFilteredData();
             renderVol(data);
             renderMS(data);
+            renderHierarchies(data);
             runAskAssistant();
         }
 
@@ -820,7 +846,10 @@ def get_offline_html_bundle(df_json, user_name, user_role):
                 const segRecords = data.filter(d => d.seg === group.seg);
                 const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
                 const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
-                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${((sLM/gtLM)*100).toFixed(1)}%</td><td>${((sTM/gtTM)*100).toFixed(1)}%</td><td>${(((sTM/gtTM)-(sLM/gtLM))*100).toFixed(1)}%</td></tr>`;
+                const sLMPct = (sLM / gtLM) * 100;
+                const sTMPct = (sTM / gtTM) * 100;
+                const sGrw = sTMPct - sLMPct;
+                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${sLMPct.toFixed(1)}%</td><td>${sTMPct.toFixed(1)}%</td><td>${sGrw.toFixed(1)}%</td></tr>`;
                 group.brands.forEach(b => {
                     const bRecords = segRecords.filter(d => d.brand === b);
                     const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
@@ -835,8 +864,51 @@ def get_offline_html_bundle(df_json, user_name, user_role):
             document.getElementById('bodyMS').innerHTML = html;
         }
 
+        function calcMS(sub, brand) {
+            const segs = brand === 'MHW' ? ['Semi Premium-Whisky'] : ['Deluxe-Whisky', 'Deluxe Plus-Whisky'];
+            const bVal = sub.filter(d => d.brand === brand).reduce((a,c)=>a + toNum(c.tm), 0);
+            const dVal = sub.filter(d => segs.includes(d.seg)).reduce((a,c)=>a + toNum(c.tm), 0);
+            return dVal > 0 ? (bVal / dVal * 100) : 0.0;
+        }
+
+        function renderHierarchies(data) {
+            // H1: Target vs Ach
+            let h1 = '<thead><tr><th rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr><tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>';
+            
+            function makeH1Row(name, sub, cls, pad) {
+                const iLM = sub.filter(d => d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
+                const iTGT = sub.filter(d => d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tgt),0);
+                const iTM = sub.filter(d => d.brand==='IBDC').reduce((a,c)=>a+toNum(c.tm),0);
+                const iMS = calcMS(sub, 'IBDC');
+
+                const mLM = sub.filter(d => d.brand==='MHW').reduce((a,c)=>a+toNum(c.lm),0);
+                const mTGT = sub.filter(d => d.brand==='MHW').reduce((a,c)=>a+toNum(c.tgt),0);
+                const mTM = sub.filter(d => d.brand==='MHW').reduce((a,c)=>a+toNum(c.tm),0);
+                const mMS = calcMS(sub, 'MHW');
+
+                return `<tr class="${cls}"><td class="brand-col-text" style="padding-left:${pad}px;">${name}</td><td>${Math.round(iLM).toLocaleString()}</td><td>${Math.round(iTGT).toLocaleString()}</td><td>${Math.round(iTM).toLocaleString()}</td><td>${iMS.toFixed(1)}%</td><td>${Math.round(mLM).toLocaleString()}</td><td>${Math.round(mTGT).toLocaleString()}</td><td>${Math.round(mTM).toLocaleString()}</td><td>${mMS.toFixed(1)}%</td></tr>`;
+            }
+
+            h1 += makeH1Row('West Bengal', data, 'grand-total-row', 8);
+            const zones = [...new Set(data.map(d => d.zone).filter(Boolean))].sort();
+            zones.forEach(z => {
+                const zData = data.filter(d => d.zone === z);
+                h1 += makeH1Row(z, zData, 'subtotal-row', 8);
+                const asms = [...new Set(zData.map(d => d.asm).filter(Boolean))].sort();
+                asms.forEach(a => {
+                    const aData = zData.filter(d => d.asm === a);
+                    h1 += makeH1Row(a, aData, 'subtotal-row', 18);
+                    const tses = [...new Set(aData.map(d => d.tse).filter(Boolean))].sort();
+                    tses.forEach(t => {
+                        const tData = aData.filter(d => d.tse === t);
+                        h1 += makeH1Row(t, tData, 'brand-row', 28);
+                    });
+                });
+            });
+            document.getElementById('tableH1').innerHTML = h1 + '</tbody>';
+        }
+
         function runAskAssistant() {
-            const q = document.getElementById('askQuery').value;
             const data = getFilteredData();
             const uniqueOutlets = [...new Set(data.map(d => d.outlet).filter(Boolean))].sort();
             let html = '<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>';
@@ -855,8 +927,15 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         }
 
         function switchMainTab(id) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            ['tabVol','tabMS','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
+            ['tabVol','tabMS','tabDash','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            document.getElementById(id).style.display = 'block';
+            event.target.classList.add('active');
+        }
+
+        function switchSubTab(id) {
+            document.querySelectorAll('.sub-tab-bar .sub-tab-btn').forEach(b => b.classList.remove('active'));
+            ['subTarget','subMS','subWOD'].forEach(t => document.getElementById(t).style.display = 'none');
             document.getElementById(id).style.display = 'block';
             event.target.classList.add('active');
         }
