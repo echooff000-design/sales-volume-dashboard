@@ -121,7 +121,7 @@ hide_streamlit_style = """
             .brand-row { 
                 background-color: #FFFFFF !important; 
                 color: #000000 !important; 
-                font-size: 13px !important;
+                font-size: 13px !important; 
             }
             .brand-col-text { 
                 text-align: left !important; 
@@ -593,9 +593,9 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC INLINE OFFLINE STANDALONE HTML BUNDLER (NO EXTERNAL FILE REQUIRED) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (ROBUST LOCAL EMBEDDING) ---
 @st.cache_data
-def get_single_file_offline_html(df_json, user_name, user_role):
+def get_offline_html_bundle(df_json, user_name, user_role):
     records_export = []
     for row in json.loads(df_json):
         records_export.append({
@@ -616,56 +616,278 @@ def get_single_file_offline_html(df_json, user_name, user_role):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WB Sale Data (Offline Mode)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WB Sale Data (Offline PWA)</title>
     <style>
-        body {{ background-color: #0f172a; color: #f8fafc; font-family: Calibri, sans-serif; margin: 0; padding: 15px; }}
-        .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px; }}
-        .card {{ background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px; margin-bottom: 15px; }}
+        * {{ box-sizing: border-box; }}
+        body {{ background-color: #0f172a; color: #f8fafc; font-family: Calibri, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 15px; }}
+        .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 10px; margin-bottom: 15px; }}
+        .user-badge {{ text-align: right; font-size: 13px; color: #f8fafc; }}
+        .user-badge span {{ color: #60a5fa; font-size: 11px; }}
+        .card {{ background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 14px; margin-bottom: 15px; }}
         .grid-filters {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }}
         label {{ font-size: 13px; font-weight: 600; color: #f8fafc; display: block; margin-bottom: 4px; }}
-        select {{ width: 100%; background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 7px 10px; border-radius: 6px; }}
-        .btn {{ background: #10b981; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }}
-        .table-wrapper {{ width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; }}
+        select, input {{ width: 100%; background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 7px 10px; border-radius: 6px; font-family: Calibri, sans-serif; font-size: 13px; }}
+        .btn {{ background: #1e293b; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.25); padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }}
+        .btn:hover {{ background: #334155; border-color: #3b82f6; }}
+        .btn-green {{ background: #10b981; border-color: #10b981; }}
+        .btn-red {{ background: #ef4444; border-color: #ef4444; }}
+        .tab-bar {{ display: flex; gap: 12px; border-bottom: 2px solid #334155; margin-bottom: 15px; overflow-x: auto; }}
+        .tab-btn {{ background: none; border: none; color: #ef4444; font-size: 14px; font-weight: 600; padding: 10px 14px; cursor: pointer; white-space: nowrap; }}
+        .tab-btn.active {{ font-weight: 700; border-bottom: 3px solid #ef4444; }}
+        .table-wrapper {{ width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; border-radius: 4px; }}
         .custom-table {{ width: 100%; border-collapse: collapse; font-family: Calibri, sans-serif; background-color: #ffffff; color: #000000; font-size: 13.5px; }}
         .custom-table th, .custom-table td {{ border: 1px solid #d3d3d3; padding: 6px 8px; text-align: center; white-space: nowrap; }}
-        .custom-table th {{ background-color: #D9E1F2; font-weight: 700; }}
-        .grand-total-row {{ background-color: #D9E1F2; font-weight: bold; font-size: 14px; }}
+        .custom-table th {{ background-color: #D9E1F2; border-bottom: 2px solid #b0b0b0; font-weight: 700; }}
+        .subtotal-row {{ font-weight: bold; background-color: #F2F2F2; text-align: left; }}
+        .brand-row {{ background-color: #FFFFFF; color: #000000; }}
+        .brand-col-text {{ text-align: left; padding-left: 8px; white-space: nowrap; }}
+        .grand-total-row {{ background-color: #D9E1F2; color: #000000; font-weight: bold; font-size: 14px; border-top: 2px solid #b0b0b0; }}
+        .highlight-green {{ background-color: #def7ec !important; color: #03543f !important; }}
+        .highlight-red {{ background-color: #fde8e8 !important; color: #9b1c1c !important; }}
+        .marked-brand {{ background-color: #EBF5FB; font-weight: bold; }}
+        .custom-table th:first-child, .custom-table td:first-child {{ position: sticky; left: 0; z-index: 2; background-color: #F2F2F2; border-right: 1px solid #d3d3d3; }}
+        .custom-table th:first-child {{ background-color: #D9E1F2; z-index: 3; }}
     </style>
 </head>
 <body>
-    <div class="header-bar">
-        <div>
-            <h3 style="margin: 0;">WB Sale Data</h3>
-            <span style="font-size: 12px; font-weight: bold; color: #10b981;">● Logged in as {user_name} ({user_role}) — Offline Mode</span>
+    <div id="mainDashboard">
+        <div class="header-bar">
+            <div>
+                <h3 style="margin: 0; font-size: 22px;">WB Sale Data</h3>
+                <span id="syncStatus" style="font-size: 12px; font-weight: bold; color: #10b981;">● Ready Offline</span>
+            </div>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="btn btn-green" onclick="manualRefreshData()" style="padding: 5px 10px; font-size: 12px;">🔄 Check Update</button>
+                <div class="user-badge">👤 <b>{user_name}</b><br><span>{user_role}</span></div>
+                <button class="btn btn-red" onclick="window.close()">Close</button>
+            </div>
         </div>
-        <button class="btn" onclick="location.reload()">🔄 Refresh Data</button>
-    </div>
-    <div class="card">
-        <h4>🔍 Filters</h4>
-        <div class="grid-filters">
-            <div><label>Group</label><select id="selGroup" onchange="updateDashboard()"></select></div>
+        <div class="card">
+            <h4 style="margin: 0 0 10px 0; font-size: 16px;">🔍 Filters</h4>
+            <div class="grid-filters">
+                <div><label>Group</label><select id="selGroup" onchange="onGroupChange()"></select></div>
+                <div><label>ASM</label><select id="selASM" onchange="onASMChange()"></select></div>
+                <div><label>TSE</label><select id="selTSE" onchange="onTSEChange()"></select></div>
+                <div><label>LIC No</label><select id="selLIC" onchange="onLICChange()"></select></div>
+                <div><label>Outlet</label><select id="selOutlet" onchange="onOutletChange()"></select></div>
+            </div>
+        </div>
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchMainTab('tabVol')">📦 Volume</button>
+            <button class="tab-btn" onclick="switchMainTab('tabMS')">📈 Ms%</button>
+            <button class="tab-btn" onclick="switchMainTab('tabAsk')">💬 Ask Assistant</button>
+        </div>
+        <div id="tabVol"><div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div></div>
+        <div id="tabMS" style="display: none;"><div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div></div>
+        <div id="tabAsk" style="display: none;">
+            <div class="card">
+                <div class="grid-filters">
+                    <div>
+                        <label>Choose a Query / Analysis:</label>
+                        <select id="askQuery" onchange="runAskAssistant()">
+                            <option>Deluxe Industry >= 30 CS but IBDC Not Billed</option>
+                            <option>Semi Premium Whisky Industry >= 50 CS but MHW Not Billed</option>
+                            <option>TIL Non Billed Outlets</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="table-wrapper"><table class="custom-table" id="askTable"></table></div>
         </div>
     </div>
-    <div class="table-wrapper">
-        <table class="custom-table">
-            <thead><tr><th>Brand</th><th>LM</th><th>TGT</th><th>TM</th></tr></thead>
-            <tbody id="bodyVol"></tbody>
-        </table>
-    </div>
+
     <script>
-        const appSales = {json.dumps(records_export)};
+        let appSales = {json.dumps(records_export)};
+
+        if (localStorage.getItem('wb_cached_sales')) {{
+            try {{ appSales = JSON.parse(localStorage.getItem('wb_cached_sales')); }} catch(e) {{}}
+        }} else {{
+            localStorage.setItem('wb_cached_sales', JSON.stringify(appSales));
+        }}
+
+        const MASTER_STRUCTURE = [
+            {{ seg: "Deluxe-Whisky", brands: ["IBDC", "N1WSUP", "OCBL", "GGSW", "Green Label", "IQ", "MCD Lux", "Mountain Oak"] }},
+            {{ seg: "Semi Premium-Whisky", brands: ["MHW", "All Season", "Brothers", "GRAYSON'S Maxx", "OakInt", "RCW", "RGW", "ROCKFORD", "RSBS", "RSDD", "RSW", "SRB7", "Whiskots", "GRR"] }},
+            {{ seg: "Deluxe-Gin", brands: ["BLGLM", "BLGOR", "Big Ben", "Blue Riband"] }},
+            {{ seg: "Premium-Brandy", brands: ["Monarch"] }},
+            {{ seg: "Premium-Gin", brands: ["SMG", "SMGP"] }},
+            {{ seg: "Semi Premium-Brandy", brands: ["MHFB"] }},
+            {{ seg: "Single Malt-Scotch", brands: ["SIW"] }}
+        ];
+        const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
+
+        function toNum(v) {{ const n = parseFloat(v); return isNaN(n) ? 0 : n; }}
+
         window.onload = function() {{
-            const groups = [...new Set(appSales.map(d => d.group))].sort();
-            document.getElementById('selGroup').innerHTML = '<option value="All">All</option>' + groups.map(g => `<option value="${{g}}">${{g}}</option>`).join('');
+            initCascadingFilters();
             updateDashboard();
         }};
+
+        async function manualRefreshData() {{
+            if (!navigator.onLine) {{
+                alert('⚠️ You are currently offline.');
+                return;
+            }}
+            document.getElementById('syncStatus').innerText = '🔄 Checking updates...';
+            try {{
+                const res = await fetch(window.location.href);
+                const htmlText = await res.text();
+                const startIdx = htmlText.indexOf('let appSales = [');
+                const endIdx = htmlText.indexOf(';', startIdx);
+                if (startIdx !== -1 && endIdx !== -1) {{
+                    appSales = JSON.parse(htmlText.substring(startIdx + 15, endIdx));
+                    localStorage.setItem('wb_cached_sales', JSON.stringify(appSales));
+                    document.getElementById('syncStatus').innerText = '● Data Updated!';
+                    updateDashboard();
+                    alert('✓ Data successfully updated!');
+                }}
+            }} catch(err) {{
+                alert('⚠️ Could not reach server.');
+            }}
+        }}
+
+        function getScopedRecords(level) {{
+            const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
+            const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
+            const tse = decodeURIComponent(document.getElementById('selTSE').value || 'All');
+            const lic = decodeURIComponent(document.getElementById('selLIC').value || 'All');
+            return appSales.filter(d => {{
+                if (level >= 1 && grp !== 'All' && d.group !== grp) return false;
+                if (level >= 2 && asm !== 'All' && d.asm !== asm) return false;
+                if (level >= 3 && tse !== 'All' && d.tse !== tse) return false;
+                if (level >= 4 && lic !== 'All' && d.lic !== lic) return false;
+                return true;
+            }});
+        }}
+
+        function setSelectOptions(id, values) {{
+            const sel = document.getElementById(id);
+            const prev = decodeURIComponent(sel.value || 'All');
+            sel.innerHTML = '<option value="All">All</option>' + values.map(v => `<option value="${{encodeURIComponent(v)}}">${{v}}</option>`).join('');
+            if (values.includes(prev)) sel.value = encodeURIComponent(prev);
+            else sel.value = 'All';
+        }}
+
+        function initCascadingFilters() {{
+            setSelectOptions('selGroup', [...new Set(appSales.map(d => d.group).filter(Boolean))].sort());
+            onGroupChange();
+        }}
+
+        function onGroupChange() {{
+            setSelectOptions('selASM', [...new Set(getScopedRecords(1).map(d => d.asm).filter(Boolean))].sort());
+            onASMChange();
+        }}
+        function onASMChange() {{
+            setSelectOptions('selTSE', [...new Set(getScopedRecords(2).map(d => d.tse).filter(Boolean))].sort());
+            onTSEChange();
+        }}
+        function onTSEChange() {{
+            setSelectOptions('selLIC', [...new Set(getScopedRecords(3).map(d => d.lic).filter(Boolean))].sort());
+            onLICChange();
+        }}
+        function onLICChange() {{
+            setSelectOptions('selOutlet', [...new Set(getScopedRecords(4).map(d => d.outlet).filter(Boolean))].sort());
+            updateDashboard();
+        }}
+        function onOutletChange() {{ updateDashboard(); }}
+
+        function getFilteredData() {{
+            const grp = decodeURIComponent(document.getElementById('selGroup').value || 'All');
+            const asm = decodeURIComponent(document.getElementById('selASM').value || 'All');
+            const tse = decodeURIComponent(document.getElementById('selTSE').value || 'All');
+            const lic = decodeURIComponent(document.getElementById('selLIC').value || 'All');
+            const out = decodeURIComponent(document.getElementById('selOutlet').value || 'All');
+
+            return appSales.filter(d => {{
+                if (grp !== 'All' && d.group !== grp) return false;
+                if (asm !== 'All' && d.asm !== asm) return false;
+                if (tse !== 'All' && d.tse !== tse) return false;
+                if (lic !== 'All' && d.lic !== lic) return false;
+                if (out !== 'All' && d.outlet !== out) return false;
+                return true;
+            }});
+        }}
+
         function updateDashboard() {{
-            const grp = document.getElementById('selGroup').value;
-            let filtered = appSales.filter(d => grp === 'All' || d.group === grp);
-            let lm = filtered.reduce((a,c)=>a+c.lm,0);
-            let tgt = filtered.reduce((a,c)=>a+c.tgt,0);
-            let tm = filtered.reduce((a,c)=>a+c.tm,0);
-            document.getElementById('bodyVol').innerHTML = `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt).toLocaleString()}}</td><td>${{Math.round(tm).toLocaleString()}}</td></tr>`;
+            const data = getFilteredData();
+            renderVol(data);
+            renderMS(data);
+            runAskAssistant();
+        }}
+
+        function renderVol(data) {{
+            let html = '', gtLM = 0, gtTGT = 0, gtTM = 0, gtBAL = 0;
+            MASTER_STRUCTURE.forEach(group => {{
+                const segRecords = data.filter(d => d.seg === group.seg);
+                const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                const sTGT = segRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
+                const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
+                html += `<tr class="subtotal-row"><td>${{group.seg}}</td><td>${{Math.round(sLM).toLocaleString()}}</td><td>${{Math.round(sTGT).toLocaleString()}}</td><td>${{Math.round(sTM).toLocaleString()}}</td><td></td></tr>`;
+                group.brands.forEach(b => {{
+                    const bRecords = segRecords.filter(d => d.brand === b);
+                    const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                    const tgt = bRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
+                    const tm = bRecords.reduce((a,c)=>a + toNum(c.tm), 0);
+                    const isM = MARKED_BRANDS.includes(b);
+                    const bal = isM ? (tgt - tm) : '';
+                    if (isM) gtBAL += (tgt - tm);
+                    const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
+                    html += `<tr class="brand-row"><td class="brand-col-text ${{isM?'marked-brand':''}}">${{b}}</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt)}}</td><td class="${{hl}}">${{Math.round(tm).toLocaleString()}}</td><td class="${{hl}}">${{bal!==''?Math.round(bal):''}}</td></tr>`;
+                }});
+                gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
+            }});
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(gtLM).toLocaleString()}}</td><td>${{Math.round(gtTGT).toLocaleString()}}</td><td>${{Math.round(gtTM).toLocaleString()}}</td><td>${{Math.round(gtBAL)}}</td></tr>`;
+            document.getElementById('bodyVolume').innerHTML = html;
+        }}
+
+        function renderMS(data) {{
+            const gtLM = data.reduce((a,c)=>a + toNum(c.lm), 0) || 1;
+            const gtTM = data.reduce((a,c)=>a + toNum(c.tm), 0) || 1;
+            let html = '';
+            MASTER_STRUCTURE.forEach(group => {{
+                const segRecords = data.filter(d => d.seg === group.seg);
+                const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
+                html += `<tr class="subtotal-row"><td>${{group.seg}}</td><td>${{((sLM/gtLM)*100).toFixed(1)}}%</td><td>${{((sTM/gtTM)*100).toFixed(1)}}%</td><td>{(((sTM/gtTM)-(sLM/gtLM))*100).toFixed(1)}%</td></tr>`;
+                group.brands.forEach(b => {{
+                    const bRecords = segRecords.filter(d => d.brand === b);
+                    const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
+                    const tm = bRecords.reduce((a,c)=>a + toNum(c.tm), 0);
+                    const bLMPct = sLM > 0 ? (lm / sLM) * 100 : 0;
+                    const bTMPct = sTM > 0 ? (tm / sTM) * 100 : 0;
+                    const grw = bTMPct - bLMPct;
+                    html += `<tr class="brand-row"><td class="brand-col-text">${{b}}</td><td>${{bLMPct.toFixed(1)}}%</td><td>${{bTMPct.toFixed(1)}}%</td><td class="${{grw>0?'highlight-green':(grw<0?'highlight-red':'')}}">${{grw.toFixed(1)}}%</td></tr>`;
+                }});
+            }});
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>`;
+            document.getElementById('bodyMS').innerHTML = html;
+        }}
+
+        function runAskAssistant() {{
+            const q = document.getElementById('askQuery').value;
+            const data = getFilteredData();
+            const uniqueOutlets = [...new Set(data.map(d => d.outlet).filter(Boolean))].sort();
+            let html = '<thead><tr><th>LIC No</th><th>Outlet Name</th><th>ASM</th><th>TSE</th><th>Volume (CS)</th></tr></thead><tbody>';
+            let cnt = 0;
+            uniqueOutlets.forEach(out => {{
+                const rows = data.filter(d => d.outlet === out);
+                const dVol = rows.filter(d => d.seg && d.seg.includes('Deluxe')).reduce((a,c)=>a + toNum(c.tm), 0);
+                const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
+                if (dVol >= 30 && iVol === 0) {{
+                    cnt++;
+                    html += `<tr><td>${{rows[0].lic}}</td><td style="text-align:left;">${{rows[0].outlet}}</td><td>${{rows[0].asm}}</td><td>${{rows[0].tse}}</td><td><b>${{Math.round(dVol)}}</b></td></tr>`;
+                }}
+            }});
+            if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>';
+            document.getElementById('askTable').innerHTML = html + '</tbody>';
+        }}
+
+        function switchMainTab(id) {{
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            ['tabVol','tabMS','tabAsk'].forEach(t => document.getElementById(t).style.display = 'none');
+            document.getElementById(id).style.display = 'block';
+            event.target.classList.add('active');
         }}
     </script>
 </body>
@@ -685,12 +907,12 @@ st.sidebar.markdown("⚡ **Offline Capabilities**")
 active_name = st.session_state.get("user_name", "User")
 active_role = "Admin" if st.session_state.get("is_admin", False) else "User"
 
-html_payload = get_single_file_offline_html(df_raw.to_json(orient="records"), active_name, active_role)
+html_payload = get_offline_html_bundle(df_raw.to_json(orient="records"), active_name, active_role)
 b64_html = base64.b64encode(html_payload.encode("utf-8")).decode("utf-8")
 
 launch_btn_code = f"""
 <div style="width: 100%;">
-    <button onclick="window.open('data:text/html;base64,{b64_html}', '_blank')" style="
+    <button onclick="launchOffline()" style="
         width: 100%;
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
@@ -706,6 +928,18 @@ launch_btn_code = f"""
         🚀 Launch Offline Mode
     </button>
 </div>
+<script>
+function launchOffline() {{
+    const bin = atob("{b64_html}");
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) {{
+        bytes[i] = bin.charCodeAt(i);
+    }}
+    const blob = new Blob([bytes], {{ type: 'text/html;charset=utf-8' }});
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+}}
+</script>
 """
 with st.sidebar:
     components.html(launch_btn_code, height=50)
@@ -1486,7 +1720,7 @@ with main_tab4:
         html_trend += '</tr>'
         
         for b in brand_list:
-            html_trend += f'<tr class="brand-row"><td class="seg-col-text">{b}</td>'
+            html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
             for m_key in trend_months:
                 m_df = months_dict[m_key]
                 if m_df.empty:
