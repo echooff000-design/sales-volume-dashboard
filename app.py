@@ -593,16 +593,9 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML BUNDLER (CACHED WITH USER BYPASS) ---
+# --- DYNAMIC INLINE OFFLINE STANDALONE HTML BUNDLER (NO EXTERNAL FILE REQUIRED) ---
 @st.cache_data
-def get_injected_offline_html(df_json, user_name, user_role):
-    template_path = "offline_template.html"
-    if os.path.exists(template_path):
-        with open(template_path, "r", encoding="utf-8") as f:
-            template = f.read()
-    else:
-        template = "<html><body>Template file missing in repository!</body></html>"
-    
+def get_single_file_offline_html(df_json, user_name, user_role):
     records_export = []
     for row in json.loads(df_json):
         records_export.append({
@@ -619,7 +612,64 @@ def get_injected_offline_html(df_json, user_name, user_role):
             "tgt": float(row.get("Target", 0) or 0)
         })
 
-    return template.replace("{{ACTIVE_USER}}", user_name).replace("{{ACTIVE_ROLE}}", user_role).replace("{{SALES_JSON}}", json.dumps(records_export))
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WB Sale Data (Offline Mode)</title>
+    <style>
+        body {{ background-color: #0f172a; color: #f8fafc; font-family: Calibri, sans-serif; margin: 0; padding: 15px; }}
+        .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px; }}
+        .card {{ background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px; margin-bottom: 15px; }}
+        .grid-filters {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }}
+        label {{ font-size: 13px; font-weight: 600; color: #f8fafc; display: block; margin-bottom: 4px; }}
+        select {{ width: 100%; background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 7px 10px; border-radius: 6px; }}
+        .btn {{ background: #10b981; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }}
+        .table-wrapper {{ width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; }}
+        .custom-table {{ width: 100%; border-collapse: collapse; font-family: Calibri, sans-serif; background-color: #ffffff; color: #000000; font-size: 13.5px; }}
+        .custom-table th, .custom-table td {{ border: 1px solid #d3d3d3; padding: 6px 8px; text-align: center; white-space: nowrap; }}
+        .custom-table th {{ background-color: #D9E1F2; font-weight: 700; }}
+        .grand-total-row {{ background-color: #D9E1F2; font-weight: bold; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <div>
+            <h3 style="margin: 0;">WB Sale Data</h3>
+            <span style="font-size: 12px; font-weight: bold; color: #10b981;">● Logged in as {user_name} ({user_role}) — Offline Mode</span>
+        </div>
+        <button class="btn" onclick="location.reload()">🔄 Refresh Data</button>
+    </div>
+    <div class="card">
+        <h4>🔍 Filters</h4>
+        <div class="grid-filters">
+            <div><label>Group</label><select id="selGroup" onchange="updateDashboard()"></select></div>
+        </div>
+    </div>
+    <div class="table-wrapper">
+        <table class="custom-table">
+            <thead><tr><th>Brand</th><th>LM</th><th>TGT</th><th>TM</th></tr></thead>
+            <tbody id="bodyVol"></tbody>
+        </table>
+    </div>
+    <script>
+        const appSales = {json.dumps(records_export)};
+        window.onload = function() {{
+            const groups = [...new Set(appSales.map(d => d.group))].sort();
+            document.getElementById('selGroup').innerHTML = '<option value="All">All</option>' + groups.map(g => `<option value="${{g}}">${{g}}</option>`).join('');
+            updateDashboard();
+        }};
+        function updateDashboard() {{
+            const grp = document.getElementById('selGroup').value;
+            let filtered = appSales.filter(d => grp === 'All' || d.group === grp);
+            let lm = filtered.reduce((a,c)=>a+c.lm,0);
+            let tgt = filtered.reduce((a,c)=>a+c.tgt,0);
+            let tm = filtered.reduce((a,c)=>a+c.tm,0);
+            document.getElementById('bodyVol').innerHTML = `<tr class="grand-total-row"><td>Grand Total</td><td>${{Math.round(lm).toLocaleString()}}</td><td>${{Math.round(tgt).toLocaleString()}}</td><td>${{Math.round(tm).toLocaleString()}}</td></tr>`;
+        }}
+    </script>
+</body>
+</html>"""
 
 # --- SIDEBAR WITH OFFLINE LAUNCHER & ADMIN PANEL ---
 st.sidebar.markdown("📁 **Data Source**")
@@ -635,12 +685,12 @@ st.sidebar.markdown("⚡ **Offline Capabilities**")
 active_name = st.session_state.get("user_name", "User")
 active_role = "Admin" if st.session_state.get("is_admin", False) else "User"
 
-html_payload = get_injected_offline_html(df_raw.to_json(orient="records"), active_name, active_role)
+html_payload = get_single_file_offline_html(df_raw.to_json(orient="records"), active_name, active_role)
 b64_html = base64.b64encode(html_payload.encode("utf-8")).decode("utf-8")
 
 launch_btn_code = f"""
 <div style="width: 100%;">
-    <button onclick="launchOffline()" style="
+    <button onclick="window.open('data:text/html;base64,{b64_html}', '_blank')" style="
         width: 100%;
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
@@ -656,15 +706,6 @@ launch_btn_code = f"""
         🚀 Launch Offline Mode
     </button>
 </div>
-<script>
-function launchOffline() {{
-    const bin = atob("{b64_html}");
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) {{ bytes[i] = bin.charCodeAt(i); }}
-    const blob = new Blob([bytes], {{ type: 'text/html;charset=utf-8' }});
-    window.open(URL.createObjectURL(blob), '_blank');
-}}
-</script>
 """
 with st.sidebar:
     components.html(launch_btn_code, height=50)
@@ -1445,7 +1486,7 @@ with main_tab4:
         html_trend += '</tr>'
         
         for b in brand_list:
-            html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
+            html_trend += f'<tr class="brand-row"><td class="seg-col-text">{b}</td>'
             for m_key in trend_months:
                 m_df = months_dict[m_key]
                 if m_df.empty:
