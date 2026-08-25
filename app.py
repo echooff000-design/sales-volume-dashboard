@@ -15,7 +15,7 @@ from google.oauth2.service_account import Credentials
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide")
 
-# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / BUTTON / TABLE CSS ---
+# --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / BUTTON / TABLE / TAB CSS FOR MOBILE ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -58,6 +58,18 @@ hide_streamlit_style = """
                 color: #ffffff !important;
             }
             
+            /* --- RESPONSIVE MOBILE FIXES FOR TABS & WIDGETS --- */
+            .stTabs [data-baseweb="tab-list"] {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                gap: 4px !important;
+            }
+            
+            /* Adjust spacing for slider and widgets on mobile screens */
+            [data-testid="stSlider"] {
+                max-width: 100% !important;
+            }
+
             /* --- FREEZE PANE STICKY COLUMN STYLING --- */
             .table-wrapper th:first-child,
             .table-wrapper td:first-child {
@@ -173,7 +185,6 @@ cookie_manager = get_manager()
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 def get_current_session_cycle_date(now_ist):
-    # Session cycle resets at 11:59:59 PM IST (meaning new session starts each calendar day)
     return now_ist.date().strftime("%Y-%m-%d")
 
 def get_seconds_until_next_1159_pm(now_ist):
@@ -325,7 +336,6 @@ try:
 except Exception:
     pass
 
-# Check if session cookie belongs to a previous day cycle
 if cached_user_val and cached_user_cycle != active_cycle_date:
     try:
         cookie_manager.delete("wb_sale_user")
@@ -354,7 +364,6 @@ if "authenticated" not in st.session_state:
         st.session_state["session_cycle"] = ""
         st.session_state["is_admin"] = False
 
-# Enforce expiration if date has changed or session cycle mismatch
 if st.session_state.get("authenticated", False):
     if st.session_state.get("session_cycle") != active_cycle_date:
         try:
@@ -632,10 +641,10 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         .btn:hover { background: #334155; border-color: #3b82f6; }
         .btn-green { background: #10b981; border-color: #10b981; }
         .btn-red { background: #ef4444; border-color: #ef4444; }
-        .tab-bar { display: flex; gap: 12px; border-bottom: 2px solid #334155; margin-bottom: 15px; overflow-x: auto; }
+        .tab-bar { display: flex; gap: 12px; border-bottom: 2px solid #334155; margin-bottom: 15px; overflow-x: auto; flex-wrap: wrap; }
         .tab-btn { background: none; border: none; color: #ef4444; font-size: 14px; font-weight: 600; padding: 10px 14px; cursor: pointer; white-space: nowrap; }
         .tab-btn.active { font-weight: 700; border-bottom: 3px solid #ef4444; }
-        .sub-tab-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+        .sub-tab-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
         .sub-tab-btn { background: #1e293b; border: 1px solid #475569; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
         .sub-tab-btn.active { background: #3b82f6; color: #ffffff; border-color: #3b82f6; }
         .table-wrapper { width: 100%; overflow-x: auto; margin-bottom: 20px; background: #ffffff; border: 1px solid #d3d3d3; border-radius: 4px; }
