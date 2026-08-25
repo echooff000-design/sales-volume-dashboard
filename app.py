@@ -165,7 +165,7 @@ def get_sheet():
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_ID).sheet1
 
-# --- 3. COOKIE MANAGER & 12:02 AM IST EXPIRATION HELPERS ---
+# --- 3. COOKIE MANAGER & 11:59 PM IST EXPIRATION HELPERS ---
 def get_manager():
     return stx.CookieManager()
 
@@ -173,13 +173,11 @@ cookie_manager = get_manager()
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 def get_current_session_cycle_date(now_ist):
-    cutoff_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
-    if now_ist < cutoff_today:
-        return (now_ist.date() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    # Session cycle resets at 11:59:59 PM IST (meaning new session starts each calendar day)
     return now_ist.date().strftime("%Y-%m-%d")
 
-def get_seconds_until_next_1202_am(now_ist):
-    target_today = now_ist.replace(hour=0, minute=2, second=0, microsecond=0)
+def get_seconds_until_next_1159_pm(now_ist):
+    target_today = now_ist.replace(hour=23, minute=59, second=0, microsecond=0)
     if now_ist < target_today:
         next_cutoff = target_today
     else:
@@ -327,6 +325,7 @@ try:
 except Exception:
     pass
 
+# Check if session cookie belongs to a previous day cycle
 if cached_user_val and cached_user_cycle != active_cycle_date:
     try:
         cookie_manager.delete("wb_sale_user")
@@ -336,7 +335,7 @@ if cached_user_val and cached_user_cycle != active_cycle_date:
     cached_user_val = None
 
 if "authenticated" not in st.session_state:
-    if cached_user_val:
+    if cached_user_val and cached_user_cycle == active_cycle_date:
         user_row = df_users_clean[df_users_clean["Name"].str.lower() == cached_user_val.lower()]
         if not user_row.empty and str(user_row.iloc[0]["Name"]).lower() not in ["nan", "none", ""]:
             st.session_state["authenticated"] = True
@@ -355,6 +354,7 @@ if "authenticated" not in st.session_state:
         st.session_state["session_cycle"] = ""
         st.session_state["is_admin"] = False
 
+# Enforce expiration if date has changed or session cycle mismatch
 if st.session_state.get("authenticated", False):
     if st.session_state.get("session_cycle") != active_cycle_date:
         try:
@@ -426,7 +426,7 @@ if not st.session_state["authenticated"]:
                     
                     cur_now = datetime.datetime.now(IST)
                     cur_cycle = get_current_session_cycle_date(cur_now)
-                    seconds_to_expiry = get_seconds_until_next_1202_am(cur_now)
+                    seconds_to_expiry = get_seconds_until_next_1159_pm(cur_now)
                     
                     st.session_state["authenticated"] = True
                     st.session_state["user_name"] = real_name
@@ -593,7 +593,7 @@ df_raw = pd.pivot_table(
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
-# --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR (DETTO SAME UI & FEATURES) ---
+# --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR ---
 @st.cache_data
 def get_offline_html_bundle(df_json, user_name, user_role):
     records_export = []
@@ -872,7 +872,6 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         }
 
         function renderHierarchies(data) {
-            // H1: Target vs Ach
             let h1 = '<thead><tr><th rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr><tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>';
             
             function makeH1Row(name, sub, cls, pad) {
@@ -1203,7 +1202,7 @@ def generate_html_table(df, metric_type="Volume"):
     html += '</tbody></table></div>'
     return html
 
-# --- 11. HIERARCHY REPORT GENERATORS (FIXED INDEPENDENT MS% CALCULATION) ---
+# --- 11. HIERARCHY REPORT GENERATORS ---
 def get_segment_for_brand(b_name):
     if b_name == "MHW":
         return ["Semi Premium-Whisky"]
