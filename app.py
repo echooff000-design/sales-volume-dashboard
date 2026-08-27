@@ -58,18 +58,13 @@ hide_streamlit_style = """
                 color: #ffffff !important;
             }
             
-            /* --- RESPONSIVE MOBILE FIXES FOR TABS & WIDGETS --- */
+            /* --- RESPONSIVE MOBILE FIXES FOR TABS --- */
             .stTabs [data-baseweb="tab-list"] {
                 display: flex !important;
                 flex-wrap: wrap !important;
                 gap: 4px !important;
             }
             
-            /* Adjust spacing for slider and widgets on mobile screens */
-            [data-testid="stSlider"] {
-                max-width: 100% !important;
-            }
-
             /* --- FREEZE PANE STICKY COLUMN STYLING --- */
             .table-wrapper th:first-child,
             .table-wrapper td:first-child {
