@@ -198,7 +198,7 @@ def to_excel_bytes(df):
         df.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
-# --- 5. DATA FETCHING (FROM STREAMLIT SECRETS) ---
+# --- 5. DATA FETCHING (FROM STREAMLIT SECRETS WITH STABLE TTL CACHING) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
 if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
@@ -206,11 +206,11 @@ if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
 else:
     RAW_HISTORICAL_URL = "https://tilaknagarindustries-my.sharepoint.com/:x:/g/personal/andebnath_tilind_com/IQDgm_kiCV5STbn_ziAyo8_pARvUsuNLyey3WIKNVlXXCSM?download=1"
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_data_from_url(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=25)
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
         
         try:
@@ -225,7 +225,7 @@ def load_data_from_url(url):
     except Exception as e:
         return None, str(e)
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_historical_data_from_url(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
