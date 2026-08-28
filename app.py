@@ -1111,10 +1111,49 @@ if "Search Reference" in temp_df.columns:
 else:
     selected_search = []
 
+# --- QUICK FAVORITES SYSTEM ---
+if "favorite_outlets" not in st.session_state:
+    st.session_state["favorite_outlets"] = []
+
+col_fav1, col_fav2 = st.columns([3, 1])
+with col_fav1:
+    if st.session_state["favorite_outlets"]:
+        chosen_favorite = st.selectbox(
+            "⭐ Quick Load Saved Favorite Outlet", 
+            ["-- Select a Favorite --"] + st.session_state["favorite_outlets"]
+        )
+        if chosen_favorite != "-- Select a Favorite --" and chosen_favorite not in selected_search:
+            selected_search.append(chosen_favorite)
+with col_fav2:
+    if selected_search:
+        if st.button("⭐ Save Current as Favorite"):
+            for item in selected_search:
+                if item not in st.session_state["favorite_outlets"]:
+                    st.session_state["favorite_outlets"].append(item)
+            st.success("Saved to favorites!")
+
 if selected_search:
     filtered_df = temp_df[temp_df["Search Reference"].isin(selected_search)]
 else:
     filtered_df = temp_df.copy()
+
+# --- SMART TARGET ALERTS SUMMARY CARD ---
+st.markdown("### 🚨 Executive Summary & At-Risk Alerts")
+risk_df = filtered_df.copy()
+brand_summary = risk_df.groupby("Brand", observed=False)[["Target", "This Month"]].sum().reset_index()
+at_risk = brand_summary[(brand_summary["Target"] > 0) & (brand_summary["This Month"] < brand_summary["Target"])]
+
+col_alert1, col_alert2 = st.columns([2, 1])
+with col_alert1:
+    if not at_risk.empty:
+        risk_brands_list = ", ".join(at_risk["Brand"].tolist())
+        st.warning(f"⚠️ **Attention Needed:** The following priority brands are currently running below target: **{risk_brands_list}**")
+    else:
+        st.success("🎉 All priority brands are currently meeting or exceeding their targets!")
+with col_alert2:
+    total_shortfall = int((at_risk["Target"] - at_risk["This Month"]).sum()) if not at_risk.empty else 0
+    st.metric(label="Total Volume Shortfall (At-Risk)", value=f"{total_shortfall:,} CS")
+st.markdown("---")
 
 def sort_asms(asm_list):
     valid_asms = [str(a) for a in asm_list if str(a).lower() not in ["nan", "none", ""]]
