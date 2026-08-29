@@ -17,144 +17,144 @@ st.set_page_config(page_title="WB Sale Data", page_icon="logo.png", layout="wide
 
 # --- HIDE STREAMLIT BRANDING & FIX SIDEBAR / BUTTON / TABLE / TAB CSS FOR MOBILE ---
 hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            
-            /* --- FORCE SIDEBAR TO STAY DARK & PRESERVE MATERIAL ICONS --- */
-            [data-testid="stSidebar"] {
-                background-color: #0f172a !important;
-                border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-                font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
-            }
-            [data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]):not(i):not(svg):not(span[class*="material"]):not(span[class*="icon"]) {
-                color: #f8fafc !important;
-                font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
-            }
-            [data-testid="stSidebar"] a {
-                color: #60a5fa !important;
-            }
-            
-            /* --- FIX SIDEBAR BUTTONS & DOWNLOAD BUTTONS VISIBILITY IN LIGHT/NORMAL MODE --- */
-            [data-testid="stSidebar"] .stButton button, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
-                background-color: #1e293b !important;
-                color: #ffffff !important;
-                border: 1px solid rgba(255, 255, 255, 0.25) !important;
-                border-radius: 8px !important;
-                width: 100% !important;
-            }
-            [data-testid="stSidebar"] .stButton button p, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button p,
-            [data-testid="stSidebar"] .stButton button span, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button span {
-                color: #ffffff !important;
-                font-weight: 600 !important;
-            }
-            [data-testid="stSidebar"] .stButton button:hover, 
-            [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
-                background-color: #334155 !important;
-                border-color: #3b82f6 !important;
-                color: #ffffff !important;
-            }
-            
-            /* --- RESPONSIVE MOBILE FIXES FOR TABS --- */
-            .stTabs [data-baseweb="tab-list"] {
-                display: flex !important;
-                flex-wrap: wrap !important;
-                gap: 4px !important;
-            }
-            
-            /* --- FREEZE PANE STICKY COLUMN STYLING --- */
-            .table-wrapper th:first-child,
-            .table-wrapper td:first-child {
-                position: sticky !important;
-                left: 0 !important;
-                z-index: 2 !important;
-                background-color: #F2F2F2 !important;
-                border-right: 1px solid #d3d3d3 !important;
-            }
-            .table-wrapper th:first-child {
-                background-color: #D9E1F2 !important;
-                z-index: 3 !important;
-            }
-            .custom-dashboard-table .brand-row td:first-child {
-                background-color: #FFFFFF !important;
-            }
-            .custom-dashboard-table .subtotal-row td:first-child {
-                background-color: #F2F2F2 !important;
-            }
-            .custom-dashboard-table .grand-total-row td:first-child {
-                background-color: #D9E1F2 !important;
-            }
-            
-            /* --- STANDARD CALIBRI FONT & CLEAN TABLE STYLING --- */
-            .table-wrapper { 
-                width: 100%; 
-                overflow-x: auto; 
-                -webkit-overflow-scrolling: touch; 
-                margin-bottom: 20px; 
-                display: block; 
-                touch-action: pan-x pan-y pinch-zoom !important;
-            }
-            .custom-dashboard-table {
-                width: 100%;
-                border-collapse: collapse !important;
-                font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
-                background-color: #ffffff !important;
-                color: #000000 !important;
-                font-size: 13.5px !important;
-                border: 1px solid #d3d3d3 !important;
-                touch-action: pan-x pan-y pinch-zoom !important;
-            }
-            .custom-dashboard-table th, .custom-dashboard-table td {
-                border: 1px solid #d3d3d3 !important;
-                padding: 6px 8px !important;
-                text-align: center; 
-                white-space: nowrap !important;
-            }
-            .custom-dashboard-table th {
-                background-color: #D9E1F2 !important;
-                border-bottom: 2px solid #b0b0b0 !important;
-                font-weight: 700 !important;
-                font-size: 13.5px !important;
-            }
-            .subtotal-row { 
-                font-weight: bold !important; 
-                color: #000000 !important; 
-                background-color: #F2F2F2 !important; 
-                font-size: 13.5px !important; 
-            }
-            .brand-row { 
-                background-color: #FFFFFF !important; 
-                color: #000000 !important; 
-                font-size: 13px !important; 
-            }
-            .brand-col-text { 
-                text-align: left !important; 
-                padding-left: 8px !important; 
-                font-size: 13px !important; 
-                white-space: nowrap !important; 
-                color: #000000 !important; 
-            }
-            .seg-col-text { 
-                text-align: left !important; 
-                padding-left: 8px !important; 
-                line-height: 1.2 !important; 
-                font-size: 13.5px !important; 
-                white-space: nowrap !important; 
-                color: #000000 !important; 
-            }
-            .grand-total-row { 
-                background-color: #D9E1F2 !important; 
-                color: #000000 !important; 
-                font-weight: bold !important; 
-                font-size: 14px !important; 
-                border-top: 2px solid #b0b0b0 !important; 
-                white-space: nowrap !important; 
-            }
-            </style>
-            """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+
+/* --- FORCE SIDEBAR TO STAY DARK & PRESERVE MATERIAL ICONS --- */
+[data-testid="stSidebar"] {
+    background-color: #0f172a !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
+}
+[data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]):not(i):not(svg):not(span[class*="material"]):not(span[class*="icon"]) {
+    color: #f8fafc !important;
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
+}
+[data-testid="stSidebar"] a {
+    color: #60a5fa !important;
+}
+
+/* --- FIX SIDEBAR BUTTONS & DOWNLOAD BUTTONS VISIBILITY IN LIGHT/NORMAL MODE --- */
+[data-testid="stSidebar"] .stButton button, 
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+}
+[data-testid="stSidebar"] .stButton button p, 
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button p,
+[data-testid="stSidebar"] .stButton button span, 
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button span {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+[data-testid="stSidebar"] .stButton button:hover, 
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
+    background-color: #334155 !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+
+/* --- RESPONSIVE MOBILE FIXES FOR TABS --- */
+.stTabs [data-baseweb="tab-list"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+}
+
+/* --- FREEZE PANE STICKY COLUMN STYLING --- */
+.table-wrapper th:first-child,
+.table-wrapper td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 2 !important;
+    background-color: #F2F2F2 !important;
+    border-right: 1px solid #d3d3d3 !important;
+}
+.table-wrapper th:first-child {
+    background-color: #D9E1F2 !important;
+    z-index: 3 !important;
+}
+.custom-dashboard-table .brand-row td:first-child {
+    background-color: #FFFFFF !important;
+}
+.custom-dashboard-table .subtotal-row td:first-child {
+    background-color: #F2F2F2 !important;
+}
+.custom-dashboard-table .grand-total-row td:first-child {
+    background-color: #D9E1F2 !important;
+}
+
+/* --- STANDARD CALIBRI FONT & CLEAN TABLE STYLING --- */
+.table-wrapper { 
+    width: 100%; 
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch; 
+    margin-bottom: 20px; 
+    display: block; 
+    touch-action: pan-x pan-y pinch-zoom !important;
+}
+.custom-dashboard-table {
+    width: 100%;
+    border-collapse: collapse !important;
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 13.5px !important;
+    border: 1px solid #d3d3d3 !important;
+    touch-action: pan-x pan-y pinch-zoom !important;
+}
+.custom-dashboard-table th, .custom-dashboard-table td {
+    border: 1px solid #d3d3d3 !important;
+    padding: 6px 8px !important;
+    text-align: center; 
+    white-space: nowrap !important;
+}
+.custom-dashboard-table th {
+    background-color: #D9E1F2 !important;
+    border-bottom: 2px solid #b0b0b0 !important;
+    font-weight: 700 !important;
+    font-size: 13.5px !important;
+}
+.subtotal-row { 
+    font-weight: bold !important; 
+    color: #000000 !important; 
+    background-color: #F2F2F2 !important; 
+    font-size: 13.5px !important; 
+}
+.brand-row { 
+    background-color: #FFFFFF !important; 
+    color: #000000 !important; 
+    font-size: 13px !important; 
+}
+.brand-col-text { 
+    text-align: left !important; 
+    padding-left: 8px !important; 
+    font-size: 13px !important; 
+    white-space: nowrap !important; 
+    color: #000000 !important; 
+}
+.seg-col-text { 
+    text-align: left !important; 
+    padding-left: 8px !important; 
+    line-height: 1.2 !important; 
+    font-size: 13.5px !important; 
+    white-space: nowrap !important; 
+    color: #000000 !important; 
+}
+.grand-total-row { 
+    background-color: #D9E1F2 !important; 
+    color: #000000 !important; 
+    font-weight: bold !important; 
+    font-size: 14px !important; 
+    border-top: 2px solid #b0b0b0 !important; 
+    white-space: nowrap !important; 
+}
+</style>
+"""
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # --- 2. GOOGLE SHEETS CONNECTION HANDLER ---
