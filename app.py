@@ -1477,7 +1477,8 @@ with main_tab4:
                 for key_name, target_var_ref in [("M2", "df_m2"), ("M3", "df_m3"), ("M4", "df_m4"), ("M5", "df_m5")]:
                     found_key = next((k for k in hist_dfs.keys() if str(k).strip().lower() == key_name.lower()), None)
                     if found_key:
-                        processed = standardize_df(hist_dfs[found_key])
+                        raw_hist_tab = hist_dfs[found_key].copy()
+                        processed = standardize_df(raw_hist_tab)
                         processed["Metric"] = key_name
                         if target_var_ref == "df_m2": df_m2 = processed
                         elif target_var_ref == "df_m3": df_m3 = processed
