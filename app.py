@@ -1469,20 +1469,32 @@ with main_tab4:
     df_m2, df_m3, df_m4, df_m5 = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     if needs_history:
-        with st.spinner("Fetching historical data (M2, M3, M4, M5)..."):
+        with st.spinner("Fetching historical data (Jun, May, Apr, Mar)..."):
             hist_dfs, hist_err = load_historical_data_from_url(RAW_HISTORICAL_URL)
             if hist_err or not hist_dfs:
-                st.warning(f"⚠️ Note: Could not load historical Excel (M2-M5): {hist_err}. Analysis will run on available data.")
+                st.warning(f"⚠️ Note: Could not load historical Excel: {hist_err}. Analysis will run on available data.")
             else:
                 clean_hist_dfs = {str(k).strip().lower(): v for k, v in hist_dfs.items()}
-                for key_name, target_var_ref in [("m2", "df_m2"), ("m3", "df_m3"), ("m4", "df_m4"), ("m5", "df_m5")]:
-                    if key_name in clean_hist_dfs:
-                        processed = standardize_df(clean_hist_dfs[key_name])
-                        processed["Metric"] = key_name.upper()
-                        if target_var_ref == "df_m2": df_m2 = processed
-                        elif target_var_ref == "df_m3": df_m3 = processed
-                        elif target_var_ref == "df_m4": df_m4 = processed
-                        elif target_var_ref == "df_m5": df_m5 = processed
+                
+                # Check mapping against dynamic month names (e.g., "jun", "may", "apr", "mar") or fallback to M2-M5 tabs
+                mapping_pairs = [
+                    (m2_label.lower(), "df_m2"),
+                    ("m2", "df_m2"),
+                    (m3_label.lower(), "df_m3"),
+                    ("m3", "df_m3"),
+                    (m4_label.lower(), "df_m4"),
+                    ("m4", "df_m4"),
+                    (m5_label.lower(), "df_m5"),
+                    ("m5", "df_m5")
+                ]
+                
+                for tab_key, target_var in mapping_pairs:
+                    if tab_key in clean_hist_dfs:
+                        processed = standardize_df(clean_hist_dfs[tab_key])
+                        if target_var == "df_m2" and df_m2.empty: df_m2 = processed
+                        elif target_var == "df_m3" and df_m3.empty: df_m3 = processed
+                        elif target_var == "df_m4" and df_m4.empty: df_m4 = processed
+                        elif target_var == "df_m5" and df_m5.empty: df_m5 = processed
 
     brand_family_map = {
         "IBDC": ["IBDC"],
