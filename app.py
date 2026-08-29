@@ -1474,18 +1474,15 @@ with main_tab4:
             if hist_err or not hist_dfs:
                 st.warning(f"⚠️ Note: Could not load historical Excel (M2-M5): {hist_err}. Analysis will run on available data.")
             else:
-                if "M2" in hist_dfs:
-                    df_m2 = standardize_df(hist_dfs["M2"])
-                    df_m2["Metric"] = "M2"
-                if "M3" in hist_dfs:
-                    df_m3 = standardize_df(hist_dfs["M3"])
-                    df_m3["Metric"] = "M3"
-                if "M4" in hist_dfs:
-                    df_m4 = standardize_df(hist_dfs["M4"])
-                    df_m4["Metric"] = "M4"
-                if "M5" in hist_dfs:
-                    df_m5 = standardize_df(hist_dfs["M5"])
-                    df_m5["Metric"] = "M5"
+                for key_name, target_var_ref in [("M2", "df_m2"), ("M3", "df_m3"), ("M4", "df_m4"), ("M5", "df_m5")]:
+                    found_key = next((k for k in hist_dfs.keys() if str(k).strip().lower() == key_name.lower()), None)
+                    if found_key:
+                        processed = standardize_df(hist_dfs[found_key])
+                        processed["Metric"] = key_name
+                        if target_var_ref == "df_m2": df_m2 = processed
+                        elif target_var_ref == "df_m3": df_m3 = processed
+                        elif target_var_ref == "df_m4": df_m4 = processed
+                        elif target_var_ref == "df_m5": df_m5 = processed
 
     brand_family_map = {
         "IBDC": ["IBDC"],
@@ -1782,9 +1779,9 @@ with main_tab4:
         
         html_trend += f'<tr class="subtotal-row"><td class="seg-col-text"><b>{target_industry_name}</b></td>'
         for m_key in trend_months:
-            m_df = months_dict[m_key]
+            m_df = months_dict.get(m_key, pd.DataFrame())
             if m_df.empty:
-                html_trend += '<td>-</td>'
+                html_trend += '<td>0</td>'
                 continue
             ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
             if is_ms:
@@ -1799,9 +1796,9 @@ with main_tab4:
         for b in brand_list:
             html_trend += f'<tr class="brand-row"><td class="brand-col-text">{b}</td>'
             for m_key in trend_months:
-                m_df = months_dict[m_key]
+                m_df = months_dict.get(m_key, pd.DataFrame())
                 if m_df.empty:
-                    html_trend += '<td>-</td>'
+                    html_trend += '<td>0</td>'
                     continue
                 ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
                 b_sub = ind_sub[ind_sub["Brand"] == b]
