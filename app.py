@@ -1474,11 +1474,11 @@ with main_tab4:
             if hist_err or not hist_dfs:
                 st.warning(f"⚠️ Note: Could not load historical Excel (M2-M5): {hist_err}. Analysis will run on available data.")
             else:
-                for key_name, target_var_ref in [("M2", "df_m2"), ("M3", "df_m3"), ("M4", "df_m4"), ("M5", "df_m5")]:
-                    found_key = next((k for k in hist_dfs.keys() if str(k).strip().lower() == key_name.lower()), None)
-                    if found_key:
-                        processed = standardize_df(hist_dfs[found_key])
-                        processed["Metric"] = key_name
+                clean_hist_dfs = {str(k).strip().lower(): v for k, v in hist_dfs.items()}
+                for key_name, target_var_ref in [("m2", "df_m2"), ("m3", "df_m3"), ("m4", "df_m4"), ("m5", "df_m5")]:
+                    if key_name in clean_hist_dfs:
+                        processed = standardize_df(clean_hist_dfs[key_name])
+                        processed["Metric"] = key_name.upper()
                         if target_var_ref == "df_m2": df_m2 = processed
                         elif target_var_ref == "df_m3": df_m3 = processed
                         elif target_var_ref == "df_m4": df_m4 = processed
