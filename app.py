@@ -1477,8 +1477,7 @@ with main_tab4:
                 for key_name, target_var_ref in [("M2", "df_m2"), ("M3", "df_m3"), ("M4", "df_m4"), ("M5", "df_m5")]:
                     found_key = next((k for k in hist_dfs.keys() if str(k).strip().lower() == key_name.lower()), None)
                     if found_key:
-                        raw_hist_tab = hist_dfs[found_key].copy()
-                        processed = standardize_df(raw_hist_tab)
+                        processed = standardize_df(hist_dfs[found_key])
                         processed["Metric"] = key_name
                         if target_var_ref == "df_m2": df_m2 = processed
                         elif target_var_ref == "df_m3": df_m3 = processed
@@ -1769,10 +1768,10 @@ with main_tab4:
         months_dict = {
             tm_label: f_this,
             lm_label: f_last,
-            m2_label: df_m2,
-            m3_label: df_m3,
-            m4_label: df_m4,
-            m5_label: df_m5
+            m2_label: f_m2,
+            m3_label: f_m3,
+            m4_label: f_m4,
+            m5_label: f_m5
         }
         
         html_trend = '<div class="table-wrapper"><table class="custom-dashboard-table">'
@@ -1782,7 +1781,7 @@ with main_tab4:
         for m_key in trend_months:
             m_df = months_dict.get(m_key, pd.DataFrame())
             if m_df.empty:
-                html_trend += '<td>0</td>'
+                html_trend += '<td>-</td>'
                 continue
             ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
             if is_ms:
@@ -1799,7 +1798,7 @@ with main_tab4:
             for m_key in trend_months:
                 m_df = months_dict.get(m_key, pd.DataFrame())
                 if m_df.empty:
-                    html_trend += '<td>0</td>'
+                    html_trend += '<td>-</td>'
                     continue
                 ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
                 b_sub = ind_sub[ind_sub["Brand"] == b]
