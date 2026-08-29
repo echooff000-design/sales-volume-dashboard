@@ -268,30 +268,47 @@ def extract_f2_date(df_u):
         
     if pd.notna(raw_val) and str(raw_val).strip() != "":
         if isinstance(raw_val, (datetime.datetime, datetime.date, pd.Timestamp)):
-            return int(raw_val.day), raw_val.strftime("%d %b %Y")
+            return int(raw_val.day), raw_val.strftime("%d %b %Y"), pd.Timestamp(raw_val)
         
         try:
             num_val = float(str(raw_val).strip())
             if num_val > 30000:
                 dt = pd.to_datetime(num_val, unit='D', origin='1899-12-30')
-                return int(dt.day), dt.strftime("%d %b %Y")
+                return int(dt.day), dt.strftime("%d %b %Y"), dt
         except Exception:
             pass
         
         val_str = str(raw_val).strip()
         parsed_dt = pd.to_datetime(val_str, errors='coerce', dayfirst=True)
         if pd.notna(parsed_dt):
-            return int(parsed_dt.day), parsed_dt.strftime("%d %b %Y")
+            return int(parsed_dt.day), parsed_dt.strftime("%d %b %Y"), parsed_dt
             
         match = re.search(r'\b(\d{1,2})\b', val_str)
         if match:
             day_num = int(match.group(1))
-            return day_num, f"{day_num} Aug 2026"
+            dt = datetime.datetime(2026, 8, day_num)
+            return day_num, dt.strftime("%d %b %Y"), dt
             
     today_dt = datetime.datetime.now(IST)
-    return today_dt.day, today_dt.strftime("%d %b %Y")
+    return today_dt.day, today_dt.strftime("%d %b %Y"), pd.Timestamp(today_dt)
 
-days_elapsed, f2_display_date = extract_f2_date(raw_users_df)
+days_elapsed, f2_display_date, f2_dt_object = extract_f2_date(raw_users_df)
+
+# --- DYNAMIC MONTH NAME GENERATOR HELPERS ---
+def get_previous_month_dt(dt, months_back):
+    y = dt.year
+    m = dt.month - months_back
+    while m <= 0:
+        m += 12
+        y -= 1
+    return datetime.datetime(y, m, 1)
+
+tm_label = f2_dt_object.strftime("%b")
+lm_label = get_previous_month_dt(f2_dt_object, 1).strftime("%b")
+m2_label = get_previous_month_dt(f2_dt_object, 2).strftime("%b")
+m3_label = get_previous_month_dt(f2_dt_object, 3).strftime("%b")
+m4_label = get_previous_month_dt(f2_dt_object, 4).strftime("%b")
+m5_label = get_previous_month_dt(f2_dt_object, 5).strftime("%b")
 
 df_users = raw_users_df.copy()
 name_idx = 0
@@ -599,7 +616,7 @@ if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
 
 # --- DYNAMIC OFFLINE STANDALONE HTML GENERATOR ---
 @st.cache_data
-def get_offline_html_bundle(df_json, user_name, user_role):
+def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
     records_export = []
     for row in json.loads(df_json):
         records_export.append({
@@ -688,12 +705,12 @@ def get_offline_html_bundle(df_json, user_name, user_role):
 
         <!-- TAB 1: VOLUME -->
         <div id="tabVol">
-            <div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div>
+            <div class="table-wrapper"><table class="custom-table" id="tableVolume"><thead><tr><th class="brand-col-text">Brand</th><th>__LM_LBL__</th><th>TGT</th><th>__TM_LBL__</th><th>BAL</th></tr></thead><tbody id="bodyVolume"></tbody></table></div>
         </div>
 
         <!-- TAB 2: MS% -->
         <div id="tabMS" style="display: none;">
-            <div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div>
+            <div class="table-wrapper"><table class="custom-table" id="tableMS"><thead><tr><th class="brand-col-text">Brand</th><th>__LM_LBL__</th><th>__TM_LBL__</th><th>GRW</th></tr></thead><tbody id="bodyMS"></tbody></table></div>
         </div>
 
         <!-- TAB 3: DASHBOARD HIERARCHIES -->
@@ -876,7 +893,7 @@ def get_offline_html_bundle(df_json, user_name, user_role):
         }
 
         function renderHierarchies(data) {
-            let h1 = '<thead><tr><th rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr><tr><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th><th>LM</th><th>Target</th><th>MTD</th><th>MS%</th></tr></thead><tbody>';
+            let h1 = '<thead><tr><th rowspan="2">ZONE/ASM/TSE</th><th colspan="4">IBDC</th><th colspan="4">MHW</th></tr><tr><th>__LM_LBL__</th><th>Target</th><th>__TM_LBL__</th><th>MS%</th><th>__LM_LBL__</th><th>Target</th><th>__TM_LBL__</th><th>MS%</th></tr></thead><tbody>';
             
             function makeH1Row(name, sub, cls, pad) {
                 const iLM = sub.filter(d => d.brand==='IBDC').reduce((a,c)=>a+toNum(c.lm),0);
@@ -946,7 +963,12 @@ def get_offline_html_bundle(df_json, user_name, user_role):
 </body>
 </html>"""
 
-    return html_template.replace("__USER_NAME__", str(user_name)).replace("__USER_ROLE__", str(user_role)).replace("__SALES_DATA__", json.dumps(records_export))
+    return (html_template
+            .replace("__USER_NAME__", str(user_name))
+            .replace("__USER_ROLE__", str(user_role))
+            .replace("__SALES_DATA__", json.dumps(records_export))
+            .replace("__TM_LBL__", str(tm_lbl))
+            .replace("__LM_LBL__", str(lm_lbl)))
 
 # --- SIDEBAR WITH OFFLINE LAUNCHER & ADMIN PANEL ---
 st.sidebar.markdown("📁 **Data Source**")
@@ -962,7 +984,7 @@ st.sidebar.markdown("⚡ **Offline Capabilities**")
 active_name = st.session_state.get("user_name", "User")
 active_role = "Admin" if st.session_state.get("is_admin", False) else "User"
 
-html_payload = get_offline_html_bundle(df_raw.to_json(orient="records"), active_name, active_role)
+html_payload = get_offline_html_bundle(df_raw.to_json(orient="records"), active_name, active_role, tm_label, lm_label)
 b64_html = base64.b64encode(html_payload.encode("utf-8")).decode("utf-8")
 
 launch_btn_code = f"""
@@ -1149,9 +1171,9 @@ def generate_html_table(df, metric_type="Volume"):
 
     html = '<div class="table-wrapper"><table class="custom-dashboard-table">'
     if metric_type == "Volume":
-        html += '<thead><tr><th class="seg-col-text">Brand</th><th>LM</th><th>TGT</th><th>TM</th><th>BAL</th></tr></thead><tbody>'
+        html += f'<thead><tr><th class="seg-col-text">Brand</th><th>{lm_label}</th><th>TGT</th><th>{tm_label}</th><th>BAL</th></tr></thead><tbody>'
     else:
-        html += '<thead><tr><th class="seg-col-text">Brand</th><th>LM</th><th>TM</th><th>GRW</th></tr></thead><tbody>'
+        html += f'<thead><tr><th class="seg-col-text">Brand</th><th>{lm_label}</th><th>{tm_label}</th><th>GRW</th></tr></thead><tbody>'
 
     gt_last_vol = merged["Last Month"].sum()
     gt_target_vol = merged["Target"].sum()
@@ -1235,7 +1257,7 @@ def generate_hierarchy_table_1(df):
         html += f'<th colspan="4">{b}</th>'
     html += '</tr><tr>'
     for _ in brands_to_show:
-        html += '<th>LM</th><th>Target</th><th>MTD</th><th>MS%</th>'
+        html += f'<th>{lm_label}</th><th>Target</th><th>{tm_label}</th><th>MS%</th>'
     html += '</tr></thead><tbody>'
 
     def get_row_html(sub_df):
@@ -1282,7 +1304,7 @@ def generate_hierarchy_table_2(df):
         html += f'<th colspan="3">{b}</th>'
     html += '</tr><tr>'
     for _ in brands_to_show:
-        html += '<th>LM</th><th>MTD</th><th>diff</th>'
+        html += f'<th>{lm_label}</th><th>{tm_label}</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
     def get_row_html_h2(sub_df):
@@ -1321,7 +1343,7 @@ def generate_hierarchy_table_3(df):
         html += f'<th colspan="3">{b}</th>'
     html += '</tr><tr>'
     for _ in brands_to_show:
-        html += '<th>LM</th><th>MTD</th><th>diff</th>'
+        html += f'<th>{lm_label}</th><th>{tm_label}</th><th>diff</th>'
     html += '</tr></thead><tbody>'
 
     def get_outlet_counts(sub_df, brand_name):
@@ -1334,7 +1356,7 @@ def generate_hierarchy_table_3(df):
         res_html = ""
         for b in brands_to_show:
             lm_c, mtd_c, diff_c = get_outlet_counts(sub_df, b)
-            res_html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+_d}</td>'
+            res_html += f'<td>{lm_c:,}</td><td>{mtd_c:,}</td><td style="color: {"#9b1c1c" if diff_c < 0 else "#03543f"};">{diff_c:+d}</td>'
         return res_html
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>' + get_row_html_h3(df) + '</tr>'
@@ -1375,17 +1397,17 @@ with main_tab3:
     sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Target vs Ach", "MS% Details", "WOD Details"])
     
     with sub_tab1:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Zone, ASM & TSE Performance Breakdown (IBDC & MHW)</h3>", unsafe_allow_html=True)
         html_h1 = generate_hierarchy_table_1(filtered_df)
         render_zoomable_table(html_h1, "h1_tab")
 
     with sub_tab2:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Share / Growth Hierarchy Matrix (LM, MTD, Diff)</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Share / Growth Hierarchy Matrix ({lm_label}, {tm_label}, Diff)</h3>", unsafe_allow_html=True)
         html_h2 = generate_hierarchy_table_2(filtered_df)
         render_zoomable_table(html_h2, "h2_tab")
 
     with sub_tab3:
-        st.markdown("<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Unique Billing Outlet Count Comparison (LM vs MTD)</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #f8fafc; font-size: 18px; font-family: Calibri, sans-serif;'>Unique Billing Outlet Count Comparison ({lm_label} vs {tm_label})</h3>", unsafe_allow_html=True)
         html_h3 = generate_hierarchy_table_3(filtered_df)
         render_zoomable_table(html_h3, "h3_tab")
 
@@ -1399,12 +1421,12 @@ with main_tab4:
         basis_period = st.selectbox(
             "Basis on Period:",
             [
-                "This Month (TM)",
-                "Last Month (LM)",
-                "Last 2 Months (LM + M2)",
-                "Last 3 Months (LM + M2 + M3)",
-                "Last 4 Months (LM + M2 + M3 + M4)",
-                "Last 5 Months (LM + M2 + M3 + M4 + M5)"
+                f"This Month ({tm_label})",
+                f"Last Month ({lm_label})",
+                f"Last 2 Months ({lm_label} + {m2_label})",
+                f"Last 3 Months ({lm_label} + {m2_label} + {m3_label})",
+                f"Last 4 Months ({lm_label} + {m2_label} + {m3_label} + {m4_label})",
+                f"Last 5 Months ({lm_label} + {m2_label} + {m3_label} + {m4_label} + {m5_label})"
             ]
         )
         
@@ -1507,15 +1529,15 @@ with main_tab4:
     f_m4 = apply_active_filters(df_m4)
     f_m5 = apply_active_filters(df_m5)
 
-    if "This Month (TM)" in basis_period:
+    if tm_label in basis_period:
         basis_dfs = [f_this]
-    elif "Last 2 Months" in basis_period:
+    elif f"Last 2 Months" in basis_period:
         basis_dfs = [f_last, f_m2]
-    elif "Last 3 Months" in basis_period:
+    elif f"Last 3 Months" in basis_period:
         basis_dfs = [f_last, f_m2, f_m3]
-    elif "Last 4 Months" in basis_period:
+    elif f"Last 4 Months" in basis_period:
         basis_dfs = [f_last, f_m2, f_m3, f_m4]
-    elif "Last 5 Months" in basis_period:
+    elif f"Last 5 Months" in basis_period:
         basis_dfs = [f_last, f_m2, f_m3, f_m4, f_m5]
     else: 
         basis_dfs = [f_last]
@@ -1745,14 +1767,14 @@ with main_tab4:
         brand_list = deluxe_brands if is_deluxe else sp_brands
         industry_segs = ["Deluxe-Whisky", "Deluxe Plus-Whisky"] if is_deluxe else ["Semi Premium-Whisky"]
         
-        trend_months = ["TM", "LM", "M2", "M3", "M4", "M5"]
+        trend_months = [tm_label, lm_label, m2_label, m3_label, m4_label, m5_label]
         months_dict = {
-            "TM": f_this,
-            "LM": f_last,
-            "M2": f_m2,
-            "M3": f_m3,
-            "M4": f_m4,
-            "M5": f_m5
+            tm_label: f_this,
+            lm_label: f_last,
+            m2_label: df_m2,
+            m3_label: df_m3,
+            m4_label: df_m4,
+            m5_label: df_m5
         }
         
         html_trend = '<div class="table-wrapper"><table class="custom-dashboard-table">'
