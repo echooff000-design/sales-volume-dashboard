@@ -1189,12 +1189,18 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
   const c  = document.getElementById('content');
   const t  = c.querySelector('table');
   const lbl = document.getElementById('zl');
-  const MIN = 0.25, MAX = 4;
+  const MAX = 3;                 // maximum zoom in = 300%
+  let MINZ = 1;                  // maximum zoom out = fit to screen
   let z = 1, NAT = 0, userZoomed = false;
+
+  function updateMin(){
+    const vw = vp.clientWidth - 2;
+    MINZ = (NAT > vw && vw > 0) ? vw / NAT : 1;
+  }
 
   // Zoom around a focus point (cx, cy) measured inside the viewport
   function apply(nz, cx, cy){
-    nz = Math.min(MAX, Math.max(MIN, nz));
+    nz = Math.min(MAX, Math.max(MINZ, nz));
     const px = (vp.scrollLeft + cx) / z, py = (vp.scrollTop + cy) / z;
     z = nz;
     c.style.zoom = z;
@@ -1212,8 +1218,8 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
     c.style.zoom = 1; z = 1;
     if (t) t.style.width = 'auto';
     NAT = t ? t.offsetWidth : c.offsetWidth;
-    const f = NAT > vw - 2 ? (vw - 2) / NAT : 1;
-    apply(f, 0, 0);
+    updateMin();
+    apply(MINZ, 0, 0);
     vp.scrollLeft = 0; vp.scrollTop = 0;
     userZoomed = false;
   }
@@ -1253,7 +1259,7 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
 
   // Re-fit whenever the frame changes size (tab shown, rotate phone, resize window)
   if (window.ResizeObserver){
-    new ResizeObserver(() => { userZoomed ? apply(z, 0, 0) : fit(); }).observe(vp);
+    new ResizeObserver(() => { if (userZoomed){ updateMin(); apply(z, 0, 0); } else { fit(); } }).observe(vp);
   }
   window.addEventListener('resize', () => { if (!userZoomed) fit(); });
   window.addEventListener('orientationchange', () => setTimeout(() => { if (!userZoomed) fit(); }, 300));
