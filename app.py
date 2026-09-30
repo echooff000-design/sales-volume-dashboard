@@ -1144,20 +1144,103 @@ def sort_asms(asm_list):
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
 
+# --- ZOOMABLE TABLE RENDERER (AUTO-FIT + TWO-FINGER PINCH ZOOM) ---
+ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+  html, body { margin:0; padding:0; background:transparent; font-family:Calibri,'Segoe UI',Arial,sans-serif; }
+  #bar { display:flex; gap:6px; align-items:center; height:32px; }
+  #bar button { background:#1e293b; color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:6px;
+                padding:3px 12px; font-size:15px; font-weight:600; cursor:pointer; }
+  #bar button:active { background:#334155; }
+  #zl { margin-left:auto; color:#f8fafc; font-size:12px; }
+  #vp { height:calc(100vh - 38px); overflow:auto; background:#fff; border:1px solid #d3d3d3; border-radius:4px;
+        touch-action:pan-x pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+  #content { display:inline-block; }
+  .table-wrapper { overflow:visible; margin:0; }
+  .custom-dashboard-table { border-collapse:collapse; background:#fff; color:#000; font-size:13.5px; border:1px solid #d3d3d3; }
+  .custom-dashboard-table th, .custom-dashboard-table td { border:1px solid #d3d3d3; padding:6px 8px; text-align:center; white-space:nowrap; }
+  .custom-dashboard-table th { background:#D9E1F2; border-bottom:2px solid #b0b0b0; font-weight:700; }
+  .subtotal-row { font-weight:bold; background:#F2F2F2; }
+  .brand-row { background:#fff; font-size:13px; }
+  .brand-col-text, .seg-col-text { text-align:left !important; padding-left:8px; white-space:nowrap; }
+  .grand-total-row { background:#D9E1F2; font-weight:bold; font-size:14px; border-top:2px solid #b0b0b0; }
+  /* frozen first column */
+  .custom-dashboard-table th:first-child, .custom-dashboard-table td:first-child {
+      position:sticky; left:0; z-index:2; background:#F2F2F2; border-right:1px solid #d3d3d3; }
+  .custom-dashboard-table th:first-child { background:#D9E1F2; z-index:3; }
+  .custom-dashboard-table .brand-row td:first-child { background:#fff; }
+  .custom-dashboard-table .grand-total-row td:first-child { background:#D9E1F2; }
+</style></head>
+<body>
+  <div id="bar">
+    <button id="zo">&minus;</button><button id="zf">Fit</button><button id="zi">+</button>
+    <span id="zl"></span>
+  </div>
+  <div id="vp"><div id="content">__TABLE__</div></div>
+<script>
+(function(){
+  const vp = document.getElementById('vp'), c = document.getElementById('content'), lbl = document.getElementById('zl');
+  const MIN = 0.3, MAX = 3;
+  let z = 1;
+
+  function apply(nz, cx, cy){
+    nz = Math.min(MAX, Math.max(MIN, nz));
+    const px = (vp.scrollLeft + cx) / z, py = (vp.scrollTop + cy) / z;   // content point under focus
+    z = nz; c.style.zoom = z;
+    vp.scrollLeft = px * z - cx; vp.scrollTop = py * z - cy;
+    lbl.textContent = Math.round(z * 100) + '%';
+  }
+  function fit(){
+    c.style.zoom = 1; z = 1;
+    const f = Math.min(1, (vp.clientWidth - 2) / c.offsetWidth);
+    apply(f, 0, 0); vp.scrollLeft = 0; vp.scrollTop = 0;
+  }
+
+  // two-finger pinch
+  let d0 = 0, z0 = 1;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  vp.addEventListener('touchstart', e => { if (e.touches.length === 2){ d0 = dist(e.touches); z0 = z; } }, {passive:true});
+  vp.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && d0){
+      e.preventDefault();
+      const r = vp.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      apply(z0 * dist(e.touches) / d0, cx, cy);
+    }
+  }, {passive:false});
+  vp.addEventListener('touchend', e => { if (e.touches.length < 2) d0 = 0; });
+
+  // desktop: Ctrl + wheel
+  vp.addEventListener('wheel', e => {
+    if (e.ctrlKey){ e.preventDefault(); const r = vp.getBoundingClientRect();
+      apply(z * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX - r.left, e.clientY - r.top); }
+  }, {passive:false});
+
+  // buttons
+  const mid = () => [vp.clientWidth / 2, vp.clientHeight / 2];
+  document.getElementById('zi').onclick = () => apply(z * 1.2, ...mid());
+  document.getElementById('zo').onclick = () => apply(z / 1.2, ...mid());
+  document.getElementById('zf').onclick = fit;
+
+  window.addEventListener('load', fit);
+  window.addEventListener('orientationchange', () => setTimeout(fit, 300));
+  fit();
+})();
+</script>
+</body></html>"""
+
+
 def render_zoomable_table(html_content, table_key):
-    zoom_level = st.select_slider(
-        "🔍 Table Zoom Control (Mobile / Desktop)",
-        options=[100, 125, 150, 175, 200],
-        value=100,
-        format_func=lambda x: f"{x}%",
-        key=f"zoom_ctrl_{table_key}"
+    rows = html_content.count("<tr")
+    height = int(min(650, max(300, 90 + rows * 26)))
+    components.html(
+        ZOOM_TABLE_TEMPLATE.replace("__TABLE__", html_content),
+        height=height,
+        scrolling=False,
     )
-    wrapped_html = f"""
-    <div style="zoom: {zoom_level}%; -moz-transform: scale({zoom_level/100}); -moz-transform-origin: top left; overflow-x: auto; touch-action: pan-x pan-y pinch-zoom;">
-        {html_content}
-    </div>
-    """
-    st.markdown(wrapped_html, unsafe_allow_html=True)
 
 # --- 10. HTML TABLE GENERATORS FOR ORIGINAL TABS ---
 def generate_html_table(df, metric_type="Volume"):
