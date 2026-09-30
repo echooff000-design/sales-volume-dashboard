@@ -1144,22 +1144,24 @@ def sort_asms(asm_list):
     key_accounts = [a for a in valid_asms if a.strip().lower() == "key accounts"]
     return sorted_normal + key_accounts
 
-# --- ZOOMABLE TABLE RENDERER (AUTO-FIT + TWO-FINGER PINCH ZOOM) ---
+# --- ZOOMABLE TABLE RENDERER (AUTO-FIT ANY DEVICE + TWO-FINGER PINCH ZOOM) ---
 ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
-  html, body { margin:0; padding:0; background:transparent; font-family:Calibri,'Segoe UI',Arial,sans-serif; }
+  html, body { margin:0; padding:0; height:100%; background:transparent; font-family:Calibri,'Segoe UI',Arial,sans-serif; overflow:hidden; }
   #bar { display:flex; gap:6px; align-items:center; height:32px; }
   #bar button { background:#1e293b; color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:6px;
-                padding:3px 12px; font-size:15px; font-weight:600; cursor:pointer; }
+                min-width:40px; padding:3px 12px; font-size:15px; font-weight:700; cursor:pointer; line-height:1.2; }
   #bar button:active { background:#334155; }
-  #zl { margin-left:auto; color:#f8fafc; font-size:12px; }
-  #vp { height:calc(100vh - 38px); overflow:auto; background:#fff; border:1px solid #d3d3d3; border-radius:4px;
+  #zl { margin-left:auto; color:#94a3b8; font-size:12px; }
+  #vp { position:absolute; top:38px; left:0; right:0; bottom:0; overflow:auto; background:#fff;
+        border:1px solid #d3d3d3; border-radius:4px; box-sizing:border-box;
         touch-action:pan-x pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
-  #content { display:inline-block; }
-  .table-wrapper { overflow:visible; margin:0; }
-  .custom-dashboard-table { border-collapse:collapse; background:#fff; color:#000; font-size:13.5px; border:1px solid #d3d3d3; }
+  #content { display:inline-block; min-width:100%; vertical-align:top; }
+  .table-wrapper { overflow:visible !important; margin:0 !important; width:auto !important; display:block; }
+  .custom-dashboard-table { border-collapse:collapse; width:auto; background:#fff; color:#000;
+                            font-size:13.5px; border:1px solid #d3d3d3; }
   .custom-dashboard-table th, .custom-dashboard-table td { border:1px solid #d3d3d3; padding:6px 8px; text-align:center; white-space:nowrap; }
   .custom-dashboard-table th { background:#D9E1F2; border-bottom:2px solid #b0b0b0; font-weight:700; }
   .subtotal-row { font-weight:bold; background:#F2F2F2; }
@@ -1175,33 +1177,53 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
 </style></head>
 <body>
   <div id="bar">
-    <button id="zo">&minus;</button><button id="zf">Fit</button><button id="zi">+</button>
+    <button id="zo" title="Zoom out">&minus;</button>
+    <button id="zf" title="Fit to screen">Fit</button>
+    <button id="zi" title="Zoom in">+</button>
     <span id="zl"></span>
   </div>
   <div id="vp"><div id="content">__TABLE__</div></div>
 <script>
 (function(){
-  const vp = document.getElementById('vp'), c = document.getElementById('content'), lbl = document.getElementById('zl');
-  const MIN = 0.3, MAX = 3;
-  let z = 1;
+  const vp = document.getElementById('vp');
+  const c  = document.getElementById('content');
+  const t  = c.querySelector('table');
+  const lbl = document.getElementById('zl');
+  const MIN = 0.25, MAX = 4;
+  let z = 1, NAT = 0, userZoomed = false;
 
+  // Zoom around a focus point (cx, cy) measured inside the viewport
   function apply(nz, cx, cy){
     nz = Math.min(MAX, Math.max(MIN, nz));
-    const px = (vp.scrollLeft + cx) / z, py = (vp.scrollTop + cy) / z;   // content point under focus
-    z = nz; c.style.zoom = z;
-    vp.scrollLeft = px * z - cx; vp.scrollTop = py * z - cy;
+    const px = (vp.scrollLeft + cx) / z, py = (vp.scrollTop + cy) / z;
+    z = nz;
+    c.style.zoom = z;
+    // table always fills at least the visible width (no empty white area)
+    if (t) t.style.width = Math.max(NAT, (vp.clientWidth - 2) / z) + 'px';
+    vp.scrollLeft = px * z - cx;
+    vp.scrollTop  = py * z - cy;
     lbl.textContent = Math.round(z * 100) + '%';
   }
+
+  // Fit: shrink if the table is wider than the screen, otherwise stretch to fill it
   function fit(){
+    const vw = vp.clientWidth;
+    if (vw < 60) return;                       // hidden tab / not laid out yet
     c.style.zoom = 1; z = 1;
-    const f = Math.min(1, (vp.clientWidth - 2) / c.offsetWidth);
-    apply(f, 0, 0); vp.scrollLeft = 0; vp.scrollTop = 0;
+    if (t) t.style.width = 'auto';
+    NAT = t ? t.offsetWidth : c.offsetWidth;
+    const f = NAT > vw - 2 ? (vw - 2) / NAT : 1;
+    apply(f, 0, 0);
+    vp.scrollLeft = 0; vp.scrollTop = 0;
+    userZoomed = false;
   }
 
-  // two-finger pinch
+  // Two-finger pinch
   let d0 = 0, z0 = 1;
-  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  vp.addEventListener('touchstart', e => { if (e.touches.length === 2){ d0 = dist(e.touches); z0 = z; } }, {passive:true});
+  const dist = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+  vp.addEventListener('touchstart', e => {
+    if (e.touches.length === 2){ d0 = dist(e.touches); z0 = z; userZoomed = true; }
+  }, {passive:true});
   vp.addEventListener('touchmove', e => {
     if (e.touches.length === 2 && d0){
       e.preventDefault();
@@ -1213,20 +1235,29 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
   }, {passive:false});
   vp.addEventListener('touchend', e => { if (e.touches.length < 2) d0 = 0; });
 
-  // desktop: Ctrl + wheel
+  // Desktop: Ctrl + wheel (also laptop trackpad pinch)
   vp.addEventListener('wheel', e => {
-    if (e.ctrlKey){ e.preventDefault(); const r = vp.getBoundingClientRect();
-      apply(z * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX - r.left, e.clientY - r.top); }
+    if (e.ctrlKey || e.metaKey){
+      e.preventDefault();
+      userZoomed = true;
+      const r = vp.getBoundingClientRect();
+      apply(z * Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top);
+    }
   }, {passive:false});
 
-  // buttons
+  // Buttons
   const mid = () => [vp.clientWidth / 2, vp.clientHeight / 2];
-  document.getElementById('zi').onclick = () => apply(z * 1.2, ...mid());
-  document.getElementById('zo').onclick = () => apply(z / 1.2, ...mid());
+  document.getElementById('zi').onclick = () => { userZoomed = true; apply(z * 1.2, ...mid()); };
+  document.getElementById('zo').onclick = () => { userZoomed = true; apply(z / 1.2, ...mid()); };
   document.getElementById('zf').onclick = fit;
 
+  // Re-fit whenever the frame changes size (tab shown, rotate phone, resize window)
+  if (window.ResizeObserver){
+    new ResizeObserver(() => { userZoomed ? apply(z, 0, 0) : fit(); }).observe(vp);
+  }
+  window.addEventListener('resize', () => { if (!userZoomed) fit(); });
+  window.addEventListener('orientationchange', () => setTimeout(() => { if (!userZoomed) fit(); }, 300));
   window.addEventListener('load', fit);
-  window.addEventListener('orientationchange', () => setTimeout(fit, 300));
   fit();
 })();
 </script>
@@ -1235,7 +1266,7 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
 
 def render_zoomable_table(html_content, table_key):
     rows = html_content.count("<tr")
-    height = int(min(650, max(300, 90 + rows * 26)))
+    height = int(min(720, max(320, 90 + rows * 26)))
     components.html(
         ZOOM_TABLE_TEMPLATE.replace("__TABLE__", html_content),
         height=height,
