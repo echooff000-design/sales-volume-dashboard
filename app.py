@@ -198,6 +198,15 @@ def to_excel_bytes(df):
         df.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
+
+def show_df(df):
+    """Show a dataframe with every numeric (non-ID) column at 2 decimals."""
+    cfg = {}
+    for c in df.columns:
+        if pd.api.types.is_float_dtype(df[c]):
+            cfg[c] = st.column_config.NumberColumn(format="%.2f")
+    st.dataframe(df, use_container_width=True, hide_index=True, column_config=cfg)
+
 # --- 5. DATA FETCHING (FROM STREAMLIT SECRETS WITH STABLE TTL CACHING) ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
 
@@ -758,6 +767,7 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
         const MARKED_BRANDS = ['IBDC', 'MHW', 'BLGLM', 'BLGOR', 'Monarch', 'SMG', 'SMGP', 'MHFB', 'SIW'];
 
         function toNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function f2(v) { return Number(v).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
 
         window.onload = function() {
             initCascadingFilters();
@@ -841,7 +851,7 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
                 const sLM = segRecords.reduce((a,c)=>a + toNum(c.lm), 0);
                 const sTGT = segRecords.reduce((a,c)=>a + toNum(c.tgt), 0);
                 const sTM = segRecords.reduce((a,c)=>a + toNum(c.tm), 0);
-                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${Math.round(sLM).toLocaleString()}</td><td>${Math.round(sTGT).toLocaleString()}</td><td>${Math.round(sTM).toLocaleString()}</td><td></td></tr>`;
+                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${f2(sLM)}</td><td>${f2(sTGT)}</td><td>${f2(sTM)}</td><td></td></tr>`;
                 group.brands.forEach(b => {
                     const bRecords = segRecords.filter(d => d.brand === b);
                     const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
@@ -851,11 +861,11 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
                     const bal = isM ? (tgt - tm) : '';
                     if (isM) gtBAL += (tgt - tm);
                     const hl = isM ? (tm < tgt ? 'highlight-red' : 'highlight-green') : '';
-                    html += `<tr class="brand-row"><td class="brand-col-text ${isM?'marked-brand':''}">${b}</td><td>${Math.round(lm).toLocaleString()}</td><td>${Math.round(tgt)}</td><td class="${hl}">${Math.round(tm).toLocaleString()}</td><td class="${hl}">${bal!==''?Math.round(bal):''}</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text ${isM?'marked-brand':''}">${b}</td><td>${f2(lm)}</td><td>${f2(tgt)}</td><td class="${hl}">${f2(tm)}</td><td class="${hl}">${bal!==''?f2(bal):''}</td></tr>`;
                 });
                 gtLM += sLM; gtTGT += sTGT; gtTM += sTM;
             });
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${Math.round(gtLM).toLocaleString()}</td><td>${Math.round(gtTGT).toLocaleString()}</td><td>${Math.round(gtTM).toLocaleString()}</td><td>${Math.round(gtBAL)}</td></tr>`;
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>${f2(gtLM)}</td><td>${f2(gtTGT)}</td><td>${f2(gtTM)}</td><td>${f2(gtBAL)}</td></tr>`;
             document.getElementById('bodyVolume').innerHTML = html;
         }
 
@@ -870,7 +880,7 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
                 const sLMPct = (sLM / gtLM) * 100;
                 const sTMPct = (sTM / gtTM) * 100;
                 const sGrw = sTMPct - sLMPct;
-                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${sLMPct.toFixed(1)}%</td><td>${sTMPct.toFixed(1)}%</td><td>${sGrw.toFixed(1)}%</td></tr>`;
+                html += `<tr class="subtotal-row"><td>${group.seg}</td><td>${sLMPct.toFixed(2)}%</td><td>${sTMPct.toFixed(2)}%</td><td>${sGrw.toFixed(2)}%</td></tr>`;
                 group.brands.forEach(b => {
                     const bRecords = segRecords.filter(d => d.brand === b);
                     const lm = bRecords.reduce((a,c)=>a + toNum(c.lm), 0);
@@ -878,10 +888,10 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
                     const bLMPct = sLM > 0 ? (lm / sLM) * 100 : 0;
                     const bTMPct = sTM > 0 ? (tm / sTM) * 100 : 0;
                     const grw = bTMPct - bLMPct;
-                    html += `<tr class="brand-row"><td class="brand-col-text">${b}</td><td>${bLMPct.toFixed(1)}%</td><td>${bTMPct.toFixed(1)}%</td><td class="${grw>0?'highlight-green':(grw<0?'highlight-red':'')}">${grw.toFixed(1)}%</td></tr>`;
+                    html += `<tr class="brand-row"><td class="brand-col-text">${b}</td><td>${bLMPct.toFixed(2)}%</td><td>${bTMPct.toFixed(2)}%</td><td class="${grw>0?'highlight-green':(grw<0?'highlight-red':'')}">${grw.toFixed(2)}%</td></tr>`;
                 });
             });
-            html += `<tr class="grand-total-row"><td>Grand Total</td><td>100.0%</td><td>100.0%</td><td></td></tr>`;
+            html += `<tr class="grand-total-row"><td>Grand Total</td><td>100.00%</td><td>100.00%</td><td></td></tr>`;
             document.getElementById('bodyMS').innerHTML = html;
         }
 
@@ -906,7 +916,7 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
                 const mTM = sub.filter(d => d.brand==='MHW').reduce((a,c)=>a+toNum(c.tm),0);
                 const mMS = calcMS(sub, 'MHW');
 
-                return `<tr class="${cls}"><td class="brand-col-text" style="padding-left:${pad}px;">${name}</td><td>${Math.round(iLM).toLocaleString()}</td><td>${Math.round(iTGT).toLocaleString()}</td><td>${Math.round(iTM).toLocaleString()}</td><td>${iMS.toFixed(1)}%</td><td>${Math.round(mLM).toLocaleString()}</td><td>${Math.round(mTGT).toLocaleString()}</td><td>${Math.round(mTM).toLocaleString()}</td><td>${mMS.toFixed(1)}%</td></tr>`;
+                return `<tr class="${cls}"><td class="brand-col-text" style="padding-left:${pad}px;">${name}</td><td>${f2(iLM)}</td><td>${f2(iTGT)}</td><td>${f2(iTM)}</td><td>${iMS.toFixed(2)}%</td><td>${f2(mLM)}</td><td>${f2(mTGT)}</td><td>${f2(mTM)}</td><td>${mMS.toFixed(2)}%</td></tr>`;
             }
 
             h1 += makeH1Row('West Bengal', data, 'grand-total-row', 8);
@@ -939,7 +949,7 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
                 const iVol = rows.filter(d => d.brand === 'IBDC').reduce((a,c)=>a + toNum(c.tm), 0);
                 if (dVol >= 30 && iVol === 0) {
                     cnt++;
-                    html += `<tr><td>${rows[0].lic}</td><td style="text-align:left;">${rows[0].outlet}</td><td>${rows[0].asm}</td><td>${rows[0].tse}</td><td><b>${Math.round(dVol)}</b></td></tr>`;
+                    html += `<tr><td>${rows[0].lic}</td><td style="text-align:left;">${rows[0].outlet}</td><td>${rows[0].asm}</td><td>${rows[0].tse}</td><td><b>${f2(dVol)}</b></td></tr>`;
                 }
             });
             if (!cnt) html += '<tr><td colspan="5">🎉 No gap outlets found!</td></tr>';
@@ -1168,10 +1178,13 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
   .brand-row { background:#fff; font-size:13px; }
   .brand-col-text, .seg-col-text { text-align:left !important; padding-left:8px; white-space:nowrap; }
   .grand-total-row { background:#D9E1F2; font-weight:bold; font-size:14px; border-top:2px solid #b0b0b0; }
-  /* frozen first column */
-  .custom-dashboard-table th:first-child, .custom-dashboard-table td:first-child {
+  /* frozen header rows (stay visible when scrolling down) */
+  .custom-dashboard-table thead th { position:sticky; top:0; z-index:4; background:#D9E1F2;
+      box-shadow: inset 0 -1px 0 #b0b0b0, inset -1px 0 0 #d3d3d3; }
+  /* frozen first column (body cells + top-left header cell only) */
+  .custom-dashboard-table tbody td:first-child {
       position:sticky; left:0; z-index:2; background:#F2F2F2; border-right:1px solid #d3d3d3; }
-  .custom-dashboard-table th:first-child { background:#D9E1F2; z-index:3; }
+  .custom-dashboard-table thead tr:first-child th:first-child { left:0; z-index:6; }
   .custom-dashboard-table .brand-row td:first-child { background:#fff; }
   .custom-dashboard-table .grand-total-row td:first-child { background:#D9E1F2; }
 </style></head>
@@ -1198,6 +1211,16 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
     MINZ = (NAT > vw && vw > 0) ? vw / NAT : 1;
   }
 
+  // Stack multi-row headers: each header row sticks just below the previous one
+  function stickHeader(){
+    const rows = t ? t.querySelectorAll('thead tr') : [];
+    let top = 0;
+    rows.forEach(r => {
+      r.querySelectorAll('th').forEach(th => { th.style.top = top + 'px'; });
+      top += r.offsetHeight;
+    });
+  }
+
   // Zoom around a focus point (cx, cy) measured inside the viewport
   function apply(nz, cx, cy){
     nz = Math.min(MAX, Math.max(MINZ, nz));
@@ -1218,6 +1241,7 @@ ZOOM_TABLE_TEMPLATE = """<!DOCTYPE html>
     c.style.zoom = 1; z = 1;
     if (t) t.style.width = 'auto';
     NAT = t ? t.offsetWidth : c.offsetWidth;
+    stickHeader();
     updateMin();
     apply(MINZ, 0, 0);
     vp.scrollLeft = 0; vp.scrollTop = 0;
@@ -1308,7 +1332,7 @@ def generate_html_table(df, metric_type="Volume"):
         seg_this = seg_data["This Month"].sum()
         
         if metric_type == "Volume":
-            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{int(seg_last):,}</td><td>{int(seg_target):,}</td><td>{int(seg_this):,}</td><td></td></tr>'
+            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last:,.2f}</td><td>{seg_target:,.2f}</td><td>{seg_this:,.2f}</td><td></td></tr>'
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 is_marked = b_name in marked_brands
@@ -1319,13 +1343,13 @@ def generate_html_table(df, metric_type="Volume"):
                         row_highlight = 'background-color: #fde8e8; color: #9b1c1c;'
                     else:
                         row_highlight = 'background-color: #def7ec; color: #03543f;'
-                bal_str = f"{int(row['Target'] - row['This Month']):,}" if is_marked else ""
-                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{int(row["Last Month"]):,}</td><td style="white-space:nowrap;">{int(row["Target"]):,}</td><td style="white-space:nowrap; {row_highlight}">{int(row["This Month"]):,}</td><td style="white-space:nowrap; {row_highlight}">{bal_str}</td></tr>'
+                bal_str = f"{row['Target'] - row['This Month']:,.2f}" if is_marked else ""
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{row["Last Month"]:,.2f}</td><td style="white-space:nowrap;">{row["Target"]:,.2f}</td><td style="white-space:nowrap; {row_highlight}">{row["This Month"]:,.2f}</td><td style="white-space:nowrap; {row_highlight}">{bal_str}</td></tr>'
         else: 
             seg_last_pct = (seg_last / gt_last_vol) * 100 if gt_last_vol else 0
             seg_this_pct = (seg_this / gt_this_vol) * 100 if gt_this_vol else 0
             seg_growth = seg_this_pct - seg_last_pct
-            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.1f}%</td><td>{seg_this_pct:,.1f}%</td><td>{seg_growth:,.1f}%</td></tr>'
+            html += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_last_pct:,.2f}%</td><td>{seg_this_pct:,.2f}%</td><td>{seg_growth:,.2f}%</td></tr>'
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 is_marked = b_name in marked_brands
@@ -1338,13 +1362,13 @@ def generate_html_table(df, metric_type="Volume"):
                     growth_highlight = 'background-color: #def7ec; color: #03543f;'
                 elif b_growth < 0:
                     growth_highlight = 'background-color: #fde8e8; color: #9b1c1c;'
-                growth_str = f"{b_growth:,.1f}%"
-                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.1f}%</td><td style="white-space:nowrap;">{b_this_pct:,.1f}%</td><td style="white-space:nowrap; {growth_highlight}">{growth_str}</td></tr>'
+                growth_str = f"{b_growth:,.2f}%"
+                html += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td style="white-space:nowrap;">{b_last_pct:,.2f}%</td><td style="white-space:nowrap;">{b_this_pct:,.2f}%</td><td style="white-space:nowrap; {growth_highlight}">{growth_str}</td></tr>'
 
     if metric_type == "Volume":
-        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">{int(gt_last_vol):,}</td><td style="white-space:nowrap;">{int(gt_target_vol):,}</td><td style="white-space:nowrap;">{int(gt_this_vol):,}</td><td style="white-space:nowrap;">{int(gt_bal_vol):,}</td></tr>'
+        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">{gt_last_vol:,.2f}</td><td style="white-space:nowrap;">{gt_target_vol:,.2f}</td><td style="white-space:nowrap;">{gt_this_vol:,.2f}</td><td style="white-space:nowrap;">{gt_bal_vol:,.2f}</td></tr>'
     else:
-        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.0%</td><td style="white-space:nowrap;">100.0%</td><td></td></tr>'
+        html += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td style="white-space:nowrap;">100.00%</td><td style="white-space:nowrap;">100.00%</td><td></td></tr>'
     html += '</tbody></table></div>'
     return html
 
@@ -1391,8 +1415,8 @@ def generate_hierarchy_table_1(df):
         m_tm = sub_df[sub_df['Brand']=='MHW']['This Month'].sum()
         _, m_ms, _ = calc_ms_brand(sub_df, "MHW")
 
-        return f'<td>{int(i_lm):,}</td><td>{int(i_tgt):,}</td><td>{int(i_tm):,}</td><td>{i_ms:.1f}%</td>' \
-               f'<td>{int(m_lm):,}</td><td>{int(m_tgt):,}</td><td>{int(m_tm):,}</td><td>{m_ms:.1f}%</td>'
+        return f'<td>{i_lm:,.2f}</td><td>{i_tgt:,.2f}</td><td>{i_tm:,.2f}</td><td>{i_ms:.2f}%</td>' \
+               f'<td>{m_lm:,.2f}</td><td>{m_tgt:,.2f}</td><td>{m_tm:,.2f}</td><td>{m_ms:.2f}%</td>'
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>' + get_row_html(df) + '</tr>'
 
@@ -1431,7 +1455,7 @@ def generate_hierarchy_table_2(df):
         res_html = ""
         for b in brands_to_show:
             lm, mtd, diff = calc_ms_brand(sub_df, b)
-            res_html += f'<td>{lm:.1f}%</td><td>{mtd:.1f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.1f}%</td>'
+            res_html += f'<td>{lm:.2f}%</td><td>{mtd:.2f}%</td><td style="color: {"#9b1c1c" if diff < 0 else "#03543f"};">{diff:+.2f}%</td>'
         return res_html
 
     html += f'<tr class="grand-total-row"><td class="seg-col-text">West Bengal</td>' + get_row_html_h2(df) + '</tr>'
@@ -1687,14 +1711,14 @@ with main_tab4:
         
         unbilled_df = base_outlets[(base_outlets["LIC No"].isin(basis_billed)) & (~base_outlets["LIC No"].isin(this_billed_target))].copy()
         
-        unbilled_df["Volume (CS)"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).astype(int)
+        unbilled_df["Volume (CS)"] = unbilled_df["LIC No"].map(basis_vol_map).fillna(0).round(2)
         unbilled_df = unbilled_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(unbilled_df)
         
         st.markdown(f"#### 🔍 Outlets that Billed in **{basis_period}** but Have NOT Billed **TIL Brands** this Month (Total: {out_cnt:,} Outlets):")
         
         if not unbilled_df.empty:
-            st.dataframe(unbilled_df, use_container_width=True, hide_index=True)
+            show_df(unbilled_df)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(unbilled_df), file_name=f"til_non_billing_{target_brand_choice}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No unbilled outlets found for TIL Brands within the active filter scope!")
@@ -1706,14 +1730,14 @@ with main_tab4:
         
         target_lics = set(deluxe_30_lics) - set(ibdc_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df["Deluxe Vol (CS)"] = res_df["LIC No"].map(deluxe_vol).fillna(0).astype(int)
+        res_df["Deluxe Vol (CS)"] = res_df["LIC No"].map(deluxe_vol).fillna(0).round(2)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
         st.markdown(f"#### 🔍 Outlets with Deluxe Industry Volume >= 30 CS in **{basis_period}** but IBDC NOT Billed this Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            show_df(res_df)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="deluxe_30cs_ibdc_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
@@ -1725,14 +1749,14 @@ with main_tab4:
         
         target_lics = set(sp_50_lics) - set(mhw_billed)
         res_df = base_outlets[base_outlets["LIC No"].isin(target_lics)].copy()
-        res_df["SP Vol (CS)"] = res_df["LIC No"].map(sp_vol).fillna(0).astype(int)
+        res_df["SP Vol (CS)"] = res_df["LIC No"].map(sp_vol).fillna(0).round(2)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
         st.markdown(f"#### 🔍 Outlets with Semi Premium Whisky Volume >= 50 CS in **{basis_period}** but MHW NOT Billed this Month (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            show_df(res_df)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name="sp_50cs_mhw_unbilled.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
@@ -1772,14 +1796,14 @@ with main_tab4:
         
         gap_lics = set(driver_outlets) - set(target_outlets)
         gap_df = base_outlets[base_outlets["LIC No"].isin(gap_lics)].copy()
-        gap_df["Billed Vol (CS)"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).astype(int)
+        gap_df["Billed Vol (CS)"] = gap_df["LIC No"].map(driver_vol_series).fillna(0).round(2)
         gap_df = gap_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(gap_df)
         
         st.markdown(f"#### 🔍 Outlets Billing **{display_driver}** in **{basis_period}** but NOT Billing **{display_target}** this Month (Total: {out_cnt:,} Outlets):")
         
         if not gap_df.empty:
-            st.dataframe(gap_df, use_container_width=True, hide_index=True)
+            show_df(gap_df)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(gap_df), file_name="brand_gap_outlets.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success("🎉 No gap outlets found!")
@@ -1799,14 +1823,14 @@ with main_tab4:
         
         not_repeated = set(anytime_billed) - (selected_period_billed.union(tm_billed))
         res_df = base_outlets[base_outlets["LIC No"].isin(not_repeated)].copy()
-        res_df["Historical Vol (CS)"] = res_df["LIC No"].map(target_hist_vol).fillna(0).astype(int)
+        res_df["Historical Vol (CS)"] = res_df["LIC No"].map(target_hist_vol).fillna(0).round(2)
         res_df = res_df.sort_values(by="Outlet Name", ascending=True)
         out_cnt = len(res_df)
         
         st.markdown(f"#### 🔍 Outlets that Billed **{brand_name_str}** Historically (Any Time) but NOT Billed in **{basis_period}** (Total: {out_cnt:,} Outlets):")
         
         if not res_df.empty:
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            show_df(res_df)
             st.download_button("📥 Download in Excel", data=to_excel_bytes(res_df), file_name=f"{brand_name_str}_lapsed.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
             st.success(f"🎉 No lapsed outlets found for {brand_name_str} under the active criteria!")
@@ -1831,50 +1855,50 @@ with main_tab4:
         
         gt_l3m_vol = rr_merged["L3M_Vol"].sum()
         gt_tm_vol = rr_merged["TM_Vol"].sum()
-        gt_l3m_daily = round(gt_l3m_vol / 90.0, 1)
-        gt_tm_daily = round(gt_tm_vol / float(days_elapsed), 1)
-        gt_growth_cs = round(gt_tm_daily - gt_l3m_daily, 1)
-        gt_growth_pct = round(((gt_tm_daily - gt_l3m_daily) / gt_l3m_daily) * 100, 1) if gt_l3m_daily > 0 else 0.0
+        gt_l3m_daily = round(gt_l3m_vol / 90.0, 2)
+        gt_tm_daily = round(gt_tm_vol / float(days_elapsed), 2)
+        gt_growth_cs = round(gt_tm_daily - gt_l3m_daily, 2)
+        gt_growth_pct = round(((gt_tm_daily - gt_l3m_daily) / gt_l3m_daily) * 100, 2) if gt_l3m_daily > 0 else 0.0
 
         excel_rows = []
 
         for segment, seg_data in rr_merged.groupby(seg_col, sort=False, observed=False):
             seg_l3m_v = seg_data["L3M_Vol"].sum()
             seg_tm_v = seg_data["TM_Vol"].sum()
-            seg_l3m_d = round(seg_l3m_v / 90.0, 1)
-            seg_tm_d = round(seg_tm_v / float(days_elapsed), 1)
-            seg_g_cs = round(seg_tm_d - seg_l3m_d, 1)
-            seg_g_pct = round(((seg_tm_d - seg_l3m_d) / seg_l3m_d) * 100, 1) if seg_l3m_d > 0 else 0.0
+            seg_l3m_d = round(seg_l3m_v / 90.0, 2)
+            seg_tm_d = round(seg_tm_v / float(days_elapsed), 2)
+            seg_g_cs = round(seg_tm_d - seg_l3m_d, 2)
+            seg_g_pct = round(((seg_tm_d - seg_l3m_d) / seg_l3m_d) * 100, 2) if seg_l3m_d > 0 else 0.0
             
-            html_rr += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{int(seg_l3m_v):,}</td><td>{seg_l3m_d:,.1f}</td><td>{int(seg_tm_v):,}</td><td>{seg_tm_d:,.1f}</td><td>{seg_g_cs:+,.1f}</td><td>{seg_g_pct:+,.1f}%</td></tr>'
+            html_rr += f'<tr class="subtotal-row"><td class="seg-col-text">{segment}</td><td>{seg_l3m_v:,.2f}</td><td>{seg_l3m_d:,.2f}</td><td>{seg_tm_v:,.2f}</td><td>{seg_tm_d:,.2f}</td><td>{seg_g_cs:+,.2f}</td><td>{seg_g_pct:+,.2f}%</td></tr>'
             
             for _, row in seg_data.iterrows():
                 b_name = row[brand_col]
                 b_l3m_v = row["L3M_Vol"]
                 b_tm_v = row["TM_Vol"]
-                b_l3m_d = round(b_l3m_v / 90.0, 1)
-                b_tm_d = round(b_tm_v / float(days_elapsed), 1)
-                b_g_cs = round(b_tm_d - b_l3m_d, 1)
-                b_g_pct = round(((b_tm_d - b_l3m_d) / b_l3m_d) * 100, 1) if b_l3m_d > 0 else (100.0 if b_tm_d > 0 else 0.0)
+                b_l3m_d = round(b_l3m_v / 90.0, 2)
+                b_tm_d = round(b_tm_v / float(days_elapsed), 2)
+                b_g_cs = round(b_tm_d - b_l3m_d, 2)
+                b_g_pct = round(((b_tm_d - b_l3m_d) / b_l3m_d) * 100, 2) if b_l3m_d > 0 else (100.0 if b_tm_d > 0 else 0.0)
                 
                 is_marked = b_name in marked_brands
                 bg_style = 'background-color: #EBF5FB; font-weight: bold;' if is_marked else ''
                 growth_highlight = 'background-color: #def7ec; color: #03543f;' if b_g_cs > 0 else ('background-color: #fde8e8; color: #9b1c1c;' if b_g_cs < 0 else '')
                 
-                html_rr += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{int(b_l3m_v):,}</td><td>{b_l3m_d:,.1f}</td><td>{int(b_tm_v):,}</td><td>{b_tm_d:,.1f}</td><td style="{growth_highlight}">{b_g_cs:+,.1f}</td><td style="{growth_highlight}">{b_g_pct:+,.1f}%</td></tr>'
+                html_rr += f'<tr class="brand-row"><td class="brand-col-text" style="{bg_style}">{b_name}</td><td>{b_l3m_v:,.2f}</td><td>{b_l3m_d:,.2f}</td><td>{b_tm_v:,.2f}</td><td>{b_tm_d:,.2f}</td><td style="{growth_highlight}">{b_g_cs:+,.2f}</td><td style="{growth_highlight}">{b_g_pct:+,.2f}%</td></tr>'
                 
                 excel_rows.append({
                     "Segment": segment,
                     "Brand": b_name,
-                    "L3M Total Vol": int(b_l3m_v),
+                    "L3M Total Vol": round(float(b_l3m_v), 2),
                     "L3M Daily Run (/90)": b_l3m_d,
-                    "TM Total Vol": int(b_tm_v),
+                    "TM Total Vol": round(float(b_tm_v), 2),
                     f"TM Daily Run (/{days_elapsed} Days)": b_tm_d,
                     "Growth (CS)": b_g_cs,
-                    "Growth %": f"{b_g_pct:+,.1f}%"
+                    "Growth %": f"{b_g_pct:+,.2f}%"
                 })
 
-        html_rr += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{int(gt_l3m_vol):,}</td><td>{gt_l3m_daily:,.1f}</td><td>{int(gt_tm_vol):,}</td><td>{gt_tm_daily:,.1f}</td><td>{gt_growth_cs:+,.1f}</td><td>{gt_growth_pct:+,.1f}%</td></tr>'
+        html_rr += f'<tr class="grand-total-row"><td class="seg-col-text">Grand Total</td><td>{gt_l3m_vol:,.2f}</td><td>{gt_l3m_daily:,.2f}</td><td>{gt_tm_vol:,.2f}</td><td>{gt_tm_daily:,.2f}</td><td>{gt_growth_cs:+,.2f}</td><td>{gt_growth_pct:+,.2f}%</td></tr>'
         html_rr += '</tbody></table></div>'
         
         render_zoomable_table(html_rr, "rr_query")
@@ -1918,9 +1942,9 @@ with main_tab4:
             ind_sub = m_df[m_df["Segment"].isin(industry_segs)]
             if is_ms:
                 ind_sum = ind_sub["Value"].sum()
-                html_trend += '<td>100.0%</td>' if ind_sum > 0 else '<td>0.0%</td>'
+                html_trend += '<td>100.00%</td>' if ind_sum > 0 else '<td>0.00%</td>'
             elif is_vol:
-                html_trend += f'<td>{int(ind_sub["Value"].sum()):,}</td>'
+                html_trend += f'<td>{ind_sub["Value"].sum():,.2f}</td>'
             elif is_wod:
                 html_trend += f'<td>{ind_sub[ind_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
         html_trend += '</tr>'
@@ -1939,9 +1963,9 @@ with main_tab4:
                     ind_tot = ind_sub["Value"].sum()
                     b_tot = b_sub["Value"].sum()
                     ms_pct = (b_tot / ind_tot * 100) if ind_tot > 0 else 0.0
-                    html_trend += f'<td>{ms_pct:.1f}%</td>'
+                    html_trend += f'<td>{ms_pct:.2f}%</td>'
                 elif is_vol:
-                    html_trend += f'<td>{int(b_sub["Value"].sum()):,}</td>'
+                    html_trend += f'<td>{b_sub["Value"].sum():,.2f}</td>'
                 elif is_wod:
                     html_trend += f'<td>{b_sub[b_sub["Value"] > 0]["LIC No"].nunique():,}</td>'
             html_trend += '</tr>'
