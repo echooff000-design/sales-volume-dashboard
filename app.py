@@ -6,7 +6,6 @@ import io
 import datetime
 import os
 import base64
-import re
 import json
 import extra_streamlit_components as stx
 import gspread
@@ -19,10 +18,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- PREMIUM MODERN CSS & MOBILE/LAPTOP RESPONSIVE STYLING ---
+# --- MODERN STYLING & SIDEBAR SUPPORT ---
 modern_theme_style = """
 <style>
-/* --- GLOBAL APP STYLING --- */
 .stApp {
     background-color: #0b1120 !important;
     font-family: Calibri, 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -44,7 +42,6 @@ modern_theme_style = """
     text-decoration: none !important;
 }
 
-/* --- SIDEBAR & BUTTON STYLING --- */
 [data-testid="stSidebar"] .stButton button, 
 [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
@@ -57,12 +54,12 @@ modern_theme_style = """
 }
 [data-testid="stSidebar"] .stButton button:hover, 
 [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
-    background: linear-gradient(135deg, #334155 1e293b) !important;
+    background: linear-gradient(135deg, #334155, #1e293b) !important;
     border-color: #3b82f6 !important;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
-/* --- TABS RESPONSIVE DESIGN --- */
+/* --- TABS --- */
 .stTabs [data-baseweb="tab-list"] {
     display: flex !important;
     flex-wrap: wrap !important;
@@ -75,7 +72,6 @@ modern_theme_style = """
 .stTabs [data-baseweb="tab"] {
     border-radius: 8px !important;
     padding: 8px 16px !important;
-    transition: all 0.2s ease;
 }
 .stTabs [data-baseweb="tab"] p {
     color: #94a3b8 !important;
@@ -90,11 +86,9 @@ modern_theme_style = """
     color: #ffffff !important;
     font-weight: 700 !important;
 }
-.stTabs [data-baseweb="tab-highlight"] {
-    display: none !important;
-}
+.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* --- CARD CONTAINERS --- */
+/* --- CARDS --- */
 .dashboard-card {
     background: rgba(30, 41, 59, 0.6);
     backdrop-filter: blur(12px);
@@ -106,7 +100,7 @@ modern_theme_style = """
     margin-bottom: 20px;
 }
 
-/* --- TABLE STYLING --- */
+/* --- TABLES --- */
 .table-wrapper { 
     width: 100%; 
     overflow-x: auto; 
@@ -119,7 +113,7 @@ modern_theme_style = """
 .custom-dashboard-table {
     width: 100%;
     border-collapse: collapse !important;
-    font-family: Calibri, 'Segoe UI', Arial, sans-serif !important;
+    font-family: Calibri, sans-serif !important;
     background-color: #ffffff !important;
     color: #000000 !important;
     font-size: 13.5px !important;
@@ -134,31 +128,12 @@ modern_theme_style = """
     background-color: #D9E1F2 !important;
     border-bottom: 2px solid #b0b0b0 !important;
     font-weight: 700 !important;
-    font-size: 13.5px !important;
     color: #1e293b !important;
 }
-.subtotal-row { 
-    font-weight: bold !important; 
-    color: #000000 !important; 
-    background-color: #F2F2F2 !important; 
-}
-.brand-row { 
-    background-color: #FFFFFF !important; 
-    color: #000000 !important; 
-}
-.brand-col-text, .seg-col-text { 
-    text-align: left !important; 
-    padding-left: 10px !important; 
-    white-space: nowrap !important; 
-    color: #000000 !important; 
-}
-.grand-total-row { 
-    background-color: #D9E1F2 !important; 
-    color: #000000 !important; 
-    font-weight: bold !important; 
-    font-size: 14px !important; 
-    border-top: 2px solid #b0b0b0 !important; 
-}
+.subtotal-row { font-weight: bold !important; background-color: #F2F2F2 !important; }
+.brand-row { background-color: #FFFFFF !important; }
+.brand-col-text, .seg-col-text { text-align: left !important; padding-left: 10px !important; white-space: nowrap !important; }
+.grand-total-row { background-color: #D9E1F2 !important; font-weight: bold !important; font-size: 14px !important; border-top: 2px solid #b0b0b0 !important; }
 </style>
 """
 st.markdown(modern_theme_style, unsafe_allow_html=True)
@@ -167,18 +142,14 @@ st.markdown(modern_theme_style, unsafe_allow_html=True)
 SHEET_ID = "1iEBhkOnErBiWiXgl74dYV3fYxLJvCKnff8ptkxHZ8eo"
 
 def get_sheet():
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in creds_dict:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    client = gspread.authorize(creds)
-    return client.open_by_key(SHEET_ID).sheet1
+    return gspread.authorize(creds).open_by_key(SHEET_ID).sheet1
 
-# --- 3. COOKIE MANAGER & 11:59 PM IST EXPIRATION HELPERS ---
+# --- 3. COOKIE MANAGER & TIME HELPERS ---
 def get_manager():
     return stx.CookieManager()
 
@@ -190,14 +161,9 @@ def get_current_session_cycle_date(now_ist):
 
 def get_seconds_until_next_1159_pm(now_ist):
     target_today = now_ist.replace(hour=23, minute=59, second=0, microsecond=0)
-    if now_ist < target_today:
-        next_cutoff = target_today
-    else:
-        next_cutoff = target_today + datetime.timedelta(days=1)
-    diff = int((next_cutoff - now_ist).total_seconds())
-    return max(diff, 60)
+    next_cutoff = target_today if now_ist < target_today else target_today + datetime.timedelta(days=1)
+    return max(int((next_cutoff - now_ist).total_seconds()), 60)
 
-# --- 4. EXCEL EXPORT HELPER FUNCTION ---
 def to_excel_bytes(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -205,25 +171,17 @@ def to_excel_bytes(df):
     return output.getvalue()
 
 def show_df(df):
-    cfg = {}
-    for c in df.columns:
-        if pd.api.types.is_float_dtype(df[c]):
-            cfg[c] = st.column_config.NumberColumn(format="%.2f")
+    cfg = {c: st.column_config.NumberColumn(format="%.2f") for c in df.columns if pd.api.types.is_float_dtype(df[c])}
     st.dataframe(df, use_container_width=True, hide_index=True, column_config=cfg)
 
 # --- 5. DATA FETCHING ---
 RAW_SHAREPOINT_URL = st.secrets["SHAREPOINT_URL"].split("?")[0] + "?download=1"
-
-if "HISTORICAL_SHAREPOINT_URL" in st.secrets:
-    RAW_HISTORICAL_URL = st.secrets["HISTORICAL_SHAREPOINT_URL"].split("?")[0] + "?download=1"
-else:
-    RAW_HISTORICAL_URL = "https://tilaknagarindustries-my.sharepoint.com/:x:/g/personal/andebnath_tilind_com/IQDgm_kiCV5STbn_ziAyo8_pARvUsuNLyey3WIKNVlXXCSM?download=1"
+RAW_HISTORICAL_URL = st.secrets.get("HISTORICAL_SHAREPOINT_URL", "https://tilaknagarindustries-my.sharepoint.com/:x:/g/personal/andebnath_tilind_com/IQDgm_kiCV5STbn_ziAyo8_pARvUsuNLyey3WIKNVlXXCSM?download=1").split("?")[0] + "?download=1"
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_data_from_url(url):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=30)
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
         response.raise_for_status()
         try:
             dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="pyxlsb")
@@ -238,31 +196,18 @@ def load_data_from_url(url):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_historical_data_from_url(url):
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
-        try:
-            dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="pyxlsb")
-        except Exception:
-            try:
-                dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine="openpyxl")
-            except Exception:
-                dfs = pd.read_excel(io.BytesIO(response.content), sheet_name=None)
-        return dfs, None
-    except Exception as e:
-        return None, str(e)
+    return load_data_from_url(url)
 
-with st.spinner("Connecting to live database..."):
+with st.spinner("Connecting to database..."):
     dfs, error = load_data_from_url(RAW_SHAREPOINT_URL)
 
 if error or dfs is None:
     st.error(f"⚠️ Unable to load data: {error}")
     st.stop()
 
-# --- 6. LOGIN CREDENTIAL & DATE EXTRACTOR ---
+# --- 6. AUTHENTICATION ---
 if "Users" not in dfs:
-    st.error("❌ Could not find the 'Users' sheet in your Excel file.")
+    st.error("❌ Could not find 'Users' sheet.")
     st.stop()
 
 raw_users_df = dfs["Users"].copy()
@@ -270,10 +215,8 @@ raw_users_df = dfs["Users"].copy()
 def extract_f2_date(df_u):
     raw_val = None
     date_col = next((c for c in df_u.columns if 'date' in str(c).strip().lower()), None)
-    if date_col is not None and len(df_u) > 0:
-        raw_val = df_u[date_col].iloc[0]
-    if (pd.isna(raw_val) or raw_val is None or str(raw_val).strip() == "") and df_u.shape[1] >= 6 and len(df_u) > 0:
-        raw_val = df_u.iloc[0, 5]
+    if date_col is not None and len(df_u) > 0: raw_val = df_u[date_col].iloc[0]
+    if (pd.isna(raw_val) or str(raw_val).strip() == "") and df_u.shape[1] >= 6 and len(df_u) > 0: raw_val = df_u.iloc[0, 5]
     if pd.notna(raw_val) and str(raw_val).strip() != "":
         if isinstance(raw_val, (datetime.datetime, datetime.date, pd.Timestamp)):
             return int(raw_val.day), raw_val.strftime("%d %b %Y"), pd.Timestamp(raw_val)
@@ -284,23 +227,15 @@ def extract_f2_date(df_u):
                 return int(dt.day), dt.strftime("%d %b %Y"), dt
         except Exception:
             pass
-        val_str = str(raw_val).strip()
-        parsed_dt = pd.to_datetime(val_str, errors='coerce', dayfirst=True)
-        if pd.notna(parsed_dt):
-            return int(parsed_dt.day), parsed_dt.strftime("%d %b %Y"), parsed_dt
-        match = re.search(r'\b(\d{1,2})\b', val_str)
-        if match:
-            day_num = int(match.group(1))
-            dt = datetime.datetime(2026, 8, day_num)
-            return day_num, dt.strftime("%d %b %Y"), dt
+        parsed_dt = pd.to_datetime(str(raw_val).strip(), errors='coerce', dayfirst=True)
+        if pd.notna(parsed_dt): return int(parsed_dt.day), parsed_dt.strftime("%d %b %Y"), parsed_dt
     today_dt = datetime.datetime.now(IST)
     return today_dt.day, today_dt.strftime("%d %b %Y"), pd.Timestamp(today_dt)
 
 days_elapsed, f2_display_date, f2_dt_object = extract_f2_date(raw_users_df)
 
 def get_previous_month_dt(dt, months_back):
-    y = dt.year
-    m = dt.month - months_back
+    y, m = dt.year, dt.month - months_back
     while m <= 0:
         m += 12
         y -= 1
@@ -315,17 +250,12 @@ m5_label = get_previous_month_dt(f2_dt_object, 5).strftime("%b")
 
 df_users = raw_users_df.copy()
 name_idx, user_idx, pass_idx, role_idx = 0, 1, 2, 3 if df_users.shape[1] > 3 else None
-
 for idx, col in enumerate(df_users.columns):
     c_clean = str(col).strip().lower()
-    if c_clean in ["name", "emp name", "employee name", "sales rep"] and "user" not in c_clean:
-        name_idx = idx
-    elif c_clean in ["user_id", "userid", "user id", "phone", "mobile", "login id"]:
-        user_idx = idx
-    elif "pass" in c_clean:
-        pass_idx = idx
-    elif "role" in c_clean or "admin" in c_clean:
-        role_idx = idx
+    if c_clean in ["name", "emp name", "employee name", "sales rep"] and "user" not in c_clean: name_idx = idx
+    elif c_clean in ["user_id", "userid", "user id", "phone", "mobile", "login id"]: user_idx = idx
+    elif "pass" in c_clean: pass_idx = idx
+    elif "role" in c_clean or "admin" in c_clean: role_idx = idx
 
 df_users_clean = pd.DataFrame({
     "Name": df_users.iloc[:, name_idx].astype(str).str.strip(),
@@ -337,14 +267,12 @@ df_users_clean = pd.DataFrame({
 now_ist = datetime.datetime.now(IST)
 active_cycle_date = get_current_session_cycle_date(now_ist)
 
-cached_user_val = None
-cached_user_cycle = None
+cached_user_val, cached_user_cycle = None, None
 try:
     c_val = cookie_manager.get(cookie="wb_sale_user")
     c_cycle = cookie_manager.get(cookie="wb_sale_cycle")
     if c_val and str(c_val).strip().lower() not in ["none", "nan", "null", "undefined", ""]:
-        cached_user_val = str(c_val).strip()
-        cached_user_cycle = str(c_cycle).strip() if c_cycle else None
+        cached_user_val, cached_user_cycle = str(c_val).strip(), str(c_cycle).strip() if c_cycle else None
 except Exception:
     pass
 
@@ -374,31 +302,12 @@ if not st.session_state["authenticated"]:
         <style>
         .stApp { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%) !important; }
         [data-testid="stForm"] { 
-            background: rgba(30, 41, 59, 0.75) !important; 
-            backdrop-filter: blur(16px) !important; 
-            border: 1px solid rgba(255, 255, 255, 0.1) !important; 
-            padding: 40px 30px !important; 
-            border-radius: 20px !important; 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important; 
+            background: rgba(30, 41, 59, 0.75) !important; backdrop-filter: blur(16px) !important; 
+            border: 1px solid rgba(255, 255, 255, 0.1) !important; padding: 40px 30px !important; border-radius: 20px !important; 
         }
         .stTextInput label { color: #94a3b8 !important; font-weight: 600; font-size: 13px; }
-        .stTextInput input { 
-            background-color: rgba(15, 23, 42, 0.6) !important; 
-            color: #f8fafc !important; 
-            border-radius: 10px !important; 
-            border: 1px solid rgba(255, 255, 255, 0.12) !important; 
-            padding: 12px 14px !important; 
-        }
-        .stButton button { 
-            width: 100%; 
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); 
-            color: white; 
-            border-radius: 10px; 
-            font-weight: 600; 
-            padding: 12px; 
-            border: none; 
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); 
-        }
+        .stTextInput input { background-color: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; padding: 12px 14px !important; }
+        .stButton button { width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-radius: 10px; font-weight: 600; padding: 12px; border: none; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -410,41 +319,27 @@ if not st.session_state["authenticated"]:
                 try:
                     with open("logo.png", "rb") as img_file:
                         encoded_img = base64.b64encode(img_file.read()).decode()
-                    st.markdown(f"""
-                        <div style="display: flex; justify-content: center; width: 100%; margin-bottom: 12px;">
-                            <img src="data:image/png;base64,{encoded_img}" style="width: 90px; display: block;" />
-                        </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"""<div style="display: flex; justify-content: center; width: 100%; margin-bottom: 12px;"><img src="data:image/png;base64,{encoded_img}" style="width: 90px; display: block;" /></div>""", unsafe_allow_html=True)
                 except Exception:
                     pass
-            
             st.markdown("<h2 style='color: #f8fafc; text-align: center; margin-bottom: 6px; font-size: 24px; font-weight: 700;'>WB Sale Data</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #94a3b8; text-align: center; font-size: 13px; margin-bottom: 24px;'>Sign in with your credentials to access the analytics portal</p>", unsafe_allow_html=True)
-            
+            st.markdown("<p style='color: #94a3b8; text-align: center; font-size: 13px; margin-bottom: 24px;'>Sign in to access analytics portal</p>", unsafe_allow_html=True)
             input_user = st.text_input("User ID", placeholder="Enter User ID")
             input_pass = st.text_input("Password", type="password", placeholder="Enter Password")
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-            submit_btn = st.form_submit_button("Sign In")
-            
-            if submit_btn:
-                user_match = df_users_clean[
-                    (df_users_clean["user_id"].str.lower() == str(input_user).strip().lower()) & 
-                    (df_users_clean["password"] == str(input_pass).strip())
-                ]
+            if st.form_submit_button("Sign In"):
+                user_match = df_users_clean[(df_users_clean["user_id"].str.lower() == str(input_user).strip().lower()) & (df_users_clean["password"] == str(input_pass).strip())]
                 if not user_match.empty:
                     real_name = str(user_match.iloc[0]["Name"]).strip()
                     cur_now = datetime.datetime.now(IST)
                     cur_cycle = get_current_session_cycle_date(cur_now)
-                    seconds_to_expiry = get_seconds_until_next_1159_pm(cur_now)
-                    
-                    st.session_state["authenticated"] = True
-                    st.session_state["user_name"] = real_name
-                    st.session_state["session_cycle"] = cur_cycle
-                    st.session_state["is_admin"] = str(user_match.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
-                    
+                    st.session_state.update({
+                        "authenticated": True, "user_name": real_name, "session_cycle": cur_cycle,
+                        "is_admin": str(user_match.iloc[0]["role"]).strip().lower() in ["admin", "true", "1", "yes"]
+                    })
                     try:
-                        cookie_manager.set("wb_sale_user", real_name, max_age=seconds_to_expiry)
-                        cookie_manager.set("wb_sale_cycle", cur_cycle, max_age=seconds_to_expiry)
+                        cookie_manager.set("wb_sale_user", real_name, max_age=get_seconds_until_next_1159_pm(cur_now))
+                        cookie_manager.set("wb_sale_cycle", cur_cycle, max_age=get_seconds_until_next_1159_pm(cur_now))
                     except Exception:
                         pass
                     st.rerun()
@@ -452,11 +347,10 @@ if not st.session_state["authenticated"]:
                     st.error("❌ Invalid User ID or Password")
     st.stop()
 
-# --- APP HEADER & USER BAR ---
+# --- MAIN DASHBOARD HEADER ---
 col_logo, col_title, col_logout = st.columns([0.6, 5.4, 2])
 with col_logo:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=48)
+    if os.path.exists("logo.png"): st.image("logo.png", width=48)
 with col_title:
     st.markdown("<h3 style='margin: 6px 0 0 0; font-size: 20px; color: #f8fafc; font-weight: 700;'>WB Sale Data Analytics</h3>", unsafe_allow_html=True)
 with col_logout:
@@ -472,11 +366,11 @@ with col_logout:
         st.session_state.update({"authenticated": False, "user_name": "", "session_cycle": "", "is_admin": False})
         st.rerun()
 
-# --- 7. LOAD AND PROCESS DATASETS ---
+# --- 7. LOAD AND STANDARDIZE DATASETS ---
 required_sheets = ["This Month", "Last Month", "Target Data", "Outlet Master"]
 for sheet in required_sheets:
     if sheet not in dfs:
-        st.error(f"❌ Missing required sheet: '{sheet}' in source file.")
+        st.error(f"❌ Missing required sheet: '{sheet}'")
         st.stop()
 
 df_this = dfs["This Month"].copy()
@@ -485,12 +379,9 @@ df_target = dfs["Target Data"].copy()
 df_outlet = dfs["Outlet Master"].copy()
 
 df_outlet.columns = df_outlet.columns.astype(str).str.strip()
-if "Outlet Nan" in df_outlet.columns:
-    df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
-
+if "Outlet Nan" in df_outlet.columns: df_outlet.rename(columns={"Outlet Nan": "Outlet Name"}, inplace=True)
 group_col_name = df_outlet.columns[7] if len(df_outlet.columns) > 7 else "Group"
-if group_col_name != "Group" and "Group" not in df_outlet.columns:
-    df_outlet.rename(columns={group_col_name: "Group"}, inplace=True)
+if group_col_name != "Group" and "Group" not in df_outlet.columns: df_outlet.rename(columns={group_col_name: "Group"}, inplace=True)
 
 zone_col_map = next((col for col in df_outlet.columns if "zone" in col.lower()), None)
 asm_col_map = next((col for col in df_outlet.columns if col.lower() in ["asm", "manager"]), None)
@@ -508,10 +399,8 @@ def standardize_df(d):
     d = d.copy()
     d.columns = d.columns.astype(str).str.strip()
     d.rename(columns={"Outlet Nan": "Outlet Name", "Asm": "ASM", "Volume": "Value", "volume": "Value", "val": "Value"}, inplace=True)
-    if "Segment" in d.columns:
-        d["Segment"] = d["Segment"].replace({"Deluxe Plus-Whisky": "Deluxe-Whisky"})
-    if "Brand" in d.columns:
-        d["Brand"] = d["Brand"].replace({"IBW": "IBDC"})
+    if "Segment" in d.columns: d["Segment"] = d["Segment"].replace({"Deluxe Plus-Whisky": "Deluxe-Whisky"})
+    if "Brand" in d.columns: d["Brand"] = d["Brand"].replace({"IBW": "IBDC"})
     k_col = "LIC No" if "LIC No" in d.columns else ("Outlet Name" if "Outlet Name" in d.columns else None)
     if k_col and k_col in d.columns:
         d["Group"] = d[k_col].astype(str).str.strip().map(group_mapping).fillna("Unassigned")
@@ -533,10 +422,7 @@ df_target["Metric"] = "Target"
 df_combined = pd.concat([df_this, df_last, df_target], ignore_index=True)
 dim_cols = [c for c in df_combined.columns if c not in ["Metric", "Value"]]
 
-df_raw = pd.pivot_table(
-    df_combined, values="Value", index=dim_cols, columns="Metric", aggfunc="sum"
-).reset_index()
-
+df_raw = pd.pivot_table(df_combined, values="Value", index=dim_cols, columns="Metric", aggfunc="sum").reset_index()
 if "Outlet Name" in df_raw.columns and "LIC No" in df_raw.columns:
     df_raw["Search Reference"] = df_raw["Outlet Name"].astype(str).str.strip() + " (" + df_raw["LIC No"].astype(str).str.strip() + ")"
 
@@ -665,13 +551,14 @@ def get_offline_html_bundle(df_json, user_name, user_role, tm_lbl, lm_lbl):
             .replace("__TM_LBL__", str(tm_lbl))
             .replace("__LM_LBL__", str(lm_lbl)))
 
-# --- SIDEBAR CONTROLS ---
+# --- RESTORED SIDEBAR CONTROLS ---
 st.sidebar.markdown("📁 **Data Management**")
 st.sidebar.caption(f"🕒 **Last Synced:** {f2_display_date}")
 
 if st.sidebar.button("🔄 Refresh Data Cache"):
     st.cache_data.clear()
-    st.sidebar.success("Cache successfully cleared!")
+    st.sidebar.success("Cache cleared! Fetching newest data...")
+    st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("⚡ **Offline Capabilities**")
@@ -687,14 +574,14 @@ launch_btn_code = f"""
         width: 100%;
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
-        padding: 11px 16px;
-        border-radius: 10px;
+        padding: 10px 14px;
+        border-radius: 8px;
         border: none;
         font-weight: 600;
         font-family: Calibri, sans-serif;
-        font-size: 14px;
+        font-size: 13.5px;
         cursor: pointer;
-        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
     ">
         🚀 Launch Offline Mode
     </button>
@@ -710,24 +597,30 @@ function launchOffline() {{
 </script>
 """
 with st.sidebar:
-    components.html(launch_btn_code, height=52)
-    st.caption("💡 *Works completely offline in any browser.*")
+    components.html(launch_btn_code, height=50)
+    st.caption("💡 *Works 100% offline. Bypasses login using your active session.*")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("📋 **Admin Panel**")
+
 if st.session_state.get("is_admin", False):
     try:
         sheet = get_sheet()
         all_rows = sheet.get_all_values()
         if len(all_rows) > 1:
             df_logs = pd.DataFrame(all_rows[1:], columns=all_rows[0])
-            st.sidebar.download_button("📥 Download Login Logs", data=df_logs.to_csv(index=False).encode('utf-8'), file_name="wb_login_logs.csv", mime="text/csv")
+            st.sidebar.download_button(
+                label="📥 Download Login Logs",
+                data=df_logs.to_csv(index=False).encode('utf-8'),
+                file_name="wb_login_logs.csv",
+                mime="text/csv"
+            )
         else:
-            st.sidebar.info("ℹ️ No login logs recorded yet.")
-    except Exception as e:
+            st.sidebar.info("ℹ️ No logins recorded yet.")
+    except Exception:
         st.sidebar.error("⚠️ Log Connection Error.")
 else:
-    st.sidebar.info("Logs are securely recorded.")
+    st.sidebar.info("Logs are saved securely in Google Sheets.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔗 **[Go to FTS Calculator](https://wbftscalculator.streamlit.app/)**")
@@ -751,24 +644,19 @@ col1, col2, col3, col4, col5 = st.columns(5)
 temp_df = df_raw.copy()
 
 with col1:
-    g_opts = ["All"] + sorted(temp_df["Group"].dropna().astype(str).unique().tolist())
-    sel_g = st.selectbox("Group", g_opts)
+    sel_g = st.selectbox("Group", ["All"] + sorted(temp_df["Group"].dropna().astype(str).unique().tolist()))
     if sel_g != "All": temp_df = temp_df[temp_df["Group"].astype(str) == sel_g]
 with col2:
-    a_opts = ["All"] + sorted(temp_df["ASM"].dropna().astype(str).unique().tolist())
-    sel_a = st.selectbox("ASM", a_opts)
+    sel_a = st.selectbox("ASM", ["All"] + sorted(temp_df["ASM"].dropna().astype(str).unique().tolist()))
     if sel_a != "All": temp_df = temp_df[temp_df["ASM"].astype(str) == sel_a]
 with col3:
-    t_opts = ["All"] + sorted(temp_df["TSE"].dropna().astype(str).unique().tolist())
-    sel_t = st.selectbox("TSE", t_opts)
+    sel_t = st.selectbox("TSE", ["All"] + sorted(temp_df["TSE"].dropna().astype(str).unique().tolist()))
     if sel_t != "All": temp_df = temp_df[temp_df["TSE"].astype(str) == sel_t]
 with col4:
-    l_opts = ["All"] + sorted(temp_df["LIC No"].dropna().astype(str).unique().tolist())
-    sel_l = st.selectbox("LIC No", l_opts)
+    sel_l = st.selectbox("LIC No", ["All"] + sorted(temp_df["LIC No"].dropna().astype(str).unique().tolist()))
     if sel_l != "All": temp_df = temp_df[temp_df["LIC No"].astype(str) == sel_l]
 with col5:
-    o_opts = ["All"] + sorted(temp_df["Outlet Name"].dropna().astype(str).unique().tolist())
-    sel_o = st.selectbox("Outlet", o_opts)
+    sel_o = st.selectbox("Outlet", ["All"] + sorted(temp_df["Outlet Name"].dropna().astype(str).unique().tolist()))
     if sel_o != "All": temp_df = temp_df[temp_df["Outlet Name"].astype(str) == sel_o]
 
 search_options = sorted(temp_df["Search Reference"].dropna().unique().tolist()) if "Search Reference" in temp_df.columns else []
